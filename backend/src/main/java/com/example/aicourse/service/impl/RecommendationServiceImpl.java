@@ -166,7 +166,9 @@ public class RecommendationServiceImpl implements RecommendationService {
             knowledgeGraphClient.getKnowledgePoint(progress.getKnowledgePointId())
                     .ifPresentOrElse(kp -> vo.setKnowledgePointName(kp.getName()), () -> vo.setKnowledgePointName("未知知识点"));
             vo.setMasteryLevel(progress.getMasteryLevel());
-            vo.setAverageScore(BigDecimal.valueOf(progress.getMasteryScore()));
+            if (progress.getMasteryScore() != null) {
+                vo.setAverageScore(progress.getMasteryScore().doubleValue());
+            }
             
             log.info("找到薄弱知识点: {} (ID: {}), 掌握度: {}", vo.getKnowledgePointName(), vo.getKnowledgePointId(), vo.getMasteryLevel());
             return vo;

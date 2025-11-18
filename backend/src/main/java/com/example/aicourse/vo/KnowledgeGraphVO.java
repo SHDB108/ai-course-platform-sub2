@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Graph structure returned to the frontend for visualization libraries.
+ * 图可视化结构：nodes + edges。
  */
 @Data
 @NoArgsConstructor

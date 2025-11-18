@@ -18,6 +18,9 @@ public class KnowledgeGraphController {
         this.studentService = studentService;
     }
 
+    /**
+     * 返回指定课程的知识图谱节点与连线，供前端 ECharts/G6 可视化使用。
+     */
     @GetMapping("/api/v1/knowledge-graph/{courseId}")
     public Result<KnowledgeGraphVO> getCourseKnowledgeGraph(@PathVariable Long courseId) {
         KnowledgeGraphVO graph = studentService.getCourseKnowledgeGraph(courseId);

@@ -119,12 +119,12 @@ public interface StudentService extends IService<Student>{
     com.example.aicourse.vo.task.StudentTaskStatsVO getStudentTaskStats(Long studentId);
 
     /**
-     * 聚合后的学习驾驶舱数据。
+     * 聚合后的学习驾驶舱数据（面向 /api/v1/student/my-dashboard）。
      */
     MyDashboardVO getMyDashboardData(Long studentId);
 
     /**
-     * 获取课程的知识图谱结构。
+     * 获取课程的知识图谱结构（节点+边，用于图可视化）。
      */
     KnowledgeGraphVO getCourseKnowledgeGraph(Long courseId);
 }

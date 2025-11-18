@@ -25,7 +25,7 @@ public class VideoProgressController {
     }
 
     /**
-     * API 7.7 上报视频学习进度
+     * API 7.7 上报视频学习进度（自动识别当前学生）。
      */
     @PostMapping("/{resourceId}/progress")
     public Result<Void> report(@PathVariable Long resourceId, @RequestBody ProgressDTO dto) {
@@ -35,7 +35,7 @@ public class VideoProgressController {
     }
 
     /**
-     * API 7.8 获取学生视频学习进度
+     * API 7.8 获取学生视频学习进度（仅当前学生）。
      */
     @GetMapping("/{resourceId}/progress")
     public Result<VideoProgressVO> getProgress(@PathVariable Long resourceId) {
@@ -45,7 +45,7 @@ public class VideoProgressController {
     }
 
     /**
-     * API 7.9 获取课程视频学习统计
+     * API 7.9 获取课程视频学习统计，可通过 personalView 切换为“仅自己”。
      */
     @GetMapping("/course/{courseId}/statistics")
     public Result<List<VideoStudyStatisticsVO>> getStatistics(

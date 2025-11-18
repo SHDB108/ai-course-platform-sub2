@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Aggregated “学习数据驾驶舱” endpoint for the student portal.
+ * 聚合后的“学习数据驾驶舱”接口，前端仅需一次请求即可获取首页所需全部卡片数据。
  */
 @RestController
 @RequestMapping("/api/v1/student")

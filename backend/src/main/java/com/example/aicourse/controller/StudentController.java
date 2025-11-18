@@ -32,8 +32,8 @@ public class StudentController{
 
     /**
      * API 3.1 获取学生列表 (分页)
-     * @param page 当前页码
-     * @param size 每页数量
+     * @param pageNum 当前页码
+     * @param pageSize 每页数量
      * @param keyword 搜索关键词
      * @param major 专业筛选
      * @param grade 年级筛选
@@ -189,12 +189,7 @@ public class StudentController{
     }
 
     /**
-     * API 3.8 获取学生选修的课程列表
-     * @param studentId 学生ID
-     * @param pageNum 当前页码
-     * @param pageSize 每页数量
-     * @param keyword 搜索关键词
-     * @return 学生课程列表
+     *（旧版接口，已由 /student/my-dashboard 替代）学生选课列表，依旧从登录态获取 studentId。
      */
     @Deprecated
     @GetMapping("/me/courses")
@@ -212,13 +207,7 @@ public class StudentController{
     }
 
     /**
-     * API 3.9 获取学生的任务列表
-     * @param studentId 学生ID
-     * @param pageNum 当前页码
-     * @param pageSize 每页数量
-     * @param keyword 搜索关键词
-     * @param status 任务状态筛选
-     * @return 学生任务列表
+     *（旧版接口）学生任务列表。
      */
     @Deprecated
     @GetMapping("/me/tasks")
@@ -237,9 +226,7 @@ public class StudentController{
     }
 
     /**
-     * API 3.10 获取学生仪表板统计数据
-     * @param studentId 学生ID
-     * @return 学生仪表板统计数据
+     *（旧版接口）学生仪表板统计。
      */
     @Deprecated
     @GetMapping("/me/dashboard/stats")
@@ -254,9 +241,7 @@ public class StudentController{
     }
 
     /**
-     * API 3.11 获取学生任务统计数据
-     * @param studentId 学生ID
-     * @return 学生任务统计数据
+     *（旧版接口）学生任务统计。
      */
     @Deprecated
     @GetMapping("/me/tasks/stats")

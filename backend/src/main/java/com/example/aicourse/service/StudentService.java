@@ -7,6 +7,8 @@ import com.example.aicourse.vo.PageVO; // 导入 PageVO
 import com.example.aicourse.vo.student.ImportResultVO; // 导入 ImportResultVO
 import com.example.aicourse.vo.student.StudentVO; // 导入 StudentVO
 import com.example.aicourse.vo.student.StudentDashboardStatsVO; // 导入 StudentDashboardStatsVO
+import com.example.aicourse.vo.KnowledgeGraphVO;
+import com.example.aicourse.vo.MyDashboardVO;
 import org.springframework.core.io.Resource; // 导入 Resource
 import org.springframework.http.ResponseEntity; // 导入 ResponseEntity
 import org.springframework.web.multipart.MultipartFile; // 导入 MultipartFile
@@ -115,4 +117,14 @@ public interface StudentService extends IService<Student>{
      * @return 学生任务统计数据
      */
     com.example.aicourse.vo.task.StudentTaskStatsVO getStudentTaskStats(Long studentId);
+
+    /**
+     * 聚合后的学习驾驶舱数据。
+     */
+    MyDashboardVO getMyDashboardData(Long studentId);
+
+    /**
+     * 获取课程的知识图谱结构。
+     */
+    KnowledgeGraphVO getCourseKnowledgeGraph(Long courseId);
 }

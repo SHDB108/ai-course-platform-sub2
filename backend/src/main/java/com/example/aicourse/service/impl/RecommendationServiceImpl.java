@@ -2,14 +2,12 @@ package com.example.aicourse.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.example.aicourse.client.KnowledgeGraphClient;
 import com.example.aicourse.dto.knowledge.RecommendationStatusUpdateDTO;
 import com.example.aicourse.entity.LearningRecommendation;
-import com.example.aicourse.entity.KnowledgePoint;
 import com.example.aicourse.entity.KnowledgePointProgress;
 import com.example.aicourse.repository.LearningRecommendationMapper;
-import com.example.aicourse.repository.KnowledgePointMapper;
 import com.example.aicourse.repository.KnowledgePointProgressMapper;
-import com.example.aicourse.service.AnalyticsService;
 import com.example.aicourse.service.LlmService;
 import com.example.aicourse.service.RecommendationService;
 import com.example.aicourse.vo.analytics.KnowledgePointPerformanceVO;
@@ -29,22 +27,19 @@ import java.util.List;
 public class RecommendationServiceImpl implements RecommendationService {
 
     private final LearningRecommendationMapper recommendationMapper;
-    private final AnalyticsService analyticsService;
     private final LlmService llmService; // 【优化】依赖抽象的LlmService
-    private final KnowledgePointMapper knowledgePointMapper;
     private final KnowledgePointProgressMapper knowledgePointProgressMapper;
+    private final KnowledgeGraphClient knowledgeGraphClient;
 
     @Autowired
-    public RecommendationServiceImpl(LearningRecommendationMapper recommendationMapper, 
-                                   AnalyticsService analyticsService, 
+    public RecommendationServiceImpl(LearningRecommendationMapper recommendationMapper,
                                    LlmService llmService,
-                                   KnowledgePointMapper knowledgePointMapper,
-                                   KnowledgePointProgressMapper knowledgePointProgressMapper) {
+                                   KnowledgePointProgressMapper knowledgePointProgressMapper,
+                                   KnowledgeGraphClient knowledgeGraphClient) {
         this.recommendationMapper = recommendationMapper;
-        this.analyticsService = analyticsService;
         this.llmService = llmService;
-        this.knowledgePointMapper = knowledgePointMapper;
         this.knowledgePointProgressMapper = knowledgePointProgressMapper;
+        this.knowledgeGraphClient = knowledgeGraphClient;
     }
 
     @Override
@@ -166,11 +161,10 @@ public class RecommendationServiceImpl implements RecommendationService {
         // 转换为KnowledgePointPerformanceVO
         return progressList.stream().map(progress -> {
             // 获取知识点信息
-            KnowledgePoint kp = knowledgePointMapper.selectById(progress.getKnowledgePointId());
-            
             KnowledgePointPerformanceVO vo = new KnowledgePointPerformanceVO();
             vo.setKnowledgePointId(progress.getKnowledgePointId());
-            vo.setKnowledgePointName(kp != null ? kp.getName() : "未知知识点");
+            knowledgeGraphClient.getKnowledgePoint(progress.getKnowledgePointId())
+                    .ifPresentOrElse(kp -> vo.setKnowledgePointName(kp.getName()), () -> vo.setKnowledgePointName("未知知识点"));
             vo.setMasteryLevel(progress.getMasteryLevel());
             vo.setAverageScore(BigDecimal.valueOf(progress.getMasteryScore()));
             

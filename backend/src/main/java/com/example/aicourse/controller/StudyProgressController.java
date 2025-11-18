@@ -4,6 +4,7 @@ import com.example.aicourse.utils.Result;
 import com.example.aicourse.dto.study.*;
 import com.example.aicourse.service.StudyProgressService;
 import com.example.aicourse.vo.study.*;
+import com.example.aicourse.utils.CurrentUserUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -25,11 +26,11 @@ public class StudyProgressController {
         this.studyProgressService = studyProgressService;
     }
     
-    @GetMapping("/progress/{studentId}/{courseId}")
+    @GetMapping("/progress/course/{courseId}")
     public Result<StudyProgressVO> getStudyProgress(
-            @PathVariable Long studentId,
             @PathVariable Long courseId) {
         try {
+            Long studentId = CurrentUserUtil.getCurrentUser().getId();
             StudyProgressVO progress = studyProgressService.getStudyProgress(studentId, courseId);
             return Result.ok(progress);
         } catch (Exception e) {
@@ -38,10 +39,10 @@ public class StudyProgressController {
         }
     }
     
-    @GetMapping("/progress/{studentId}")
-    public Result<List<StudyProgressVO>> getAllStudyProgress(
-            @PathVariable Long studentId) {
+    @GetMapping("/progress")
+    public Result<List<StudyProgressVO>> getAllStudyProgress() {
         try {
+            Long studentId = CurrentUserUtil.getCurrentUser().getId();
             List<StudyProgressVO> progressList = studyProgressService.getAllStudyProgress(studentId);
             return Result.ok(progressList);
         } catch (Exception e) {
@@ -50,11 +51,11 @@ public class StudyProgressController {
         }
     }
     
-    @PutMapping("/progress/{studentId}/{courseId}")
+    @PutMapping("/progress/course/{courseId}")
     public Result<Void> updateStudyProgress(
-            @PathVariable Long studentId,
             @PathVariable Long courseId) {
         try {
+            Long studentId = CurrentUserUtil.getCurrentUser().getId();
             studyProgressService.updateStudyProgress(studentId, courseId);
             return Result.ok();
         } catch (Exception e) {
@@ -63,11 +64,11 @@ public class StudyProgressController {
         }
     }
     
-    @GetMapping("/analysis/{studentId}/{courseId}")
+    @GetMapping("/analysis/course/{courseId}")
     public Result<StudyAnalysisVO> getStudyAnalysis(
-            @PathVariable Long studentId,
             @PathVariable Long courseId) {
         try {
+            Long studentId = CurrentUserUtil.getCurrentUser().getId();
             StudyAnalysisVO analysis = studyProgressService.getStudyAnalysis(studentId, courseId);
             return Result.ok(analysis);
         } catch (Exception e) {
@@ -76,10 +77,10 @@ public class StudyProgressController {
         }
     }
     
-    @GetMapping("/analysis/{studentId}")
-    public Result<StudyAnalysisVO> getOverallStudyAnalysis(
-            @PathVariable Long studentId) {
+    @GetMapping("/analysis")
+    public Result<StudyAnalysisVO> getOverallStudyAnalysis() {
         try {
+            Long studentId = CurrentUserUtil.getCurrentUser().getId();
             StudyAnalysisVO analysis = studyProgressService.getOverallStudyAnalysis(studentId);
             return Result.ok(analysis);
         } catch (Exception e) {
@@ -88,11 +89,11 @@ public class StudyProgressController {
         }
     }
     
-    @PostMapping("/sessions/{studentId}")
+    @PostMapping("/sessions")
     public Result<Long> startStudySession(
-            @PathVariable Long studentId,
             @RequestBody StudySessionCreateDTO createDTO) {
         try {
+            Long studentId = CurrentUserUtil.getCurrentUser().getId();
             Long sessionId = studyProgressService.startStudySession(studentId, createDTO);
             return Result.ok(sessionId);
         } catch (Exception e) {
@@ -114,12 +115,12 @@ public class StudyProgressController {
         }
     }
     
-    @GetMapping("/sessions/{studentId}")
+    @GetMapping("/sessions")
     public Result<List<StudySessionVO>> getStudySessionHistory(
-            @PathVariable Long studentId,
             @RequestParam(required = false) Long courseId,
             @RequestParam(defaultValue = "20") Integer limit) {
         try {
+            Long studentId = CurrentUserUtil.getCurrentUser().getId();
             List<StudySessionVO> sessions = studyProgressService.getStudySessionHistory(studentId, courseId, limit);
             return Result.ok(sessions);
         } catch (Exception e) {
@@ -128,11 +129,11 @@ public class StudyProgressController {
         }
     }
     
-    @PostMapping("/plans/{studentId}")
+    @PostMapping("/plans")
     public Result<Long> createStudyPlan(
-            @PathVariable Long studentId,
             @RequestBody StudyPlanCreateDTO createDTO) {
         try {
+            Long studentId = CurrentUserUtil.getCurrentUser().getId();
             Long planId = studyProgressService.createStudyPlan(studentId, createDTO);
             return Result.ok(planId);
         } catch (Exception e) {
@@ -141,11 +142,11 @@ public class StudyProgressController {
         }
     }
     
-    @GetMapping("/plans/{studentId}")
+    @GetMapping("/plans")
     public Result<List<StudyPlanVO>> getStudyPlans(
-            @PathVariable Long studentId,
             @RequestParam(required = false) Long courseId) {
         try {
+            Long studentId = CurrentUserUtil.getCurrentUser().getId();
             List<StudyPlanVO> plans = studyProgressService.getStudyPlans(studentId, courseId);
             return Result.ok(plans);
         } catch (Exception e) {
@@ -167,12 +168,12 @@ public class StudyProgressController {
         }
     }
     
-    @PostMapping("/plans/{studentId}/{courseId}/generate")
+    @PostMapping("/plans/course/{courseId}/generate")
     public Result<StudyPlanVO> generateAiStudyPlan(
-            @PathVariable Long studentId,
             @PathVariable Long courseId,
             @RequestParam(defaultValue = "WEEKLY") String planType) {
         try {
+            Long studentId = CurrentUserUtil.getCurrentUser().getId();
             StudyPlanVO plan = studyProgressService.generateAiStudyPlan(studentId, courseId, planType);
             return Result.ok(plan);
         } catch (Exception e) {
@@ -181,12 +182,12 @@ public class StudyProgressController {
         }
     }
     
-    @PutMapping("/knowledge-points/{studentId}/{knowledgePointId}")
+    @PutMapping("/knowledge-points/{knowledgePointId}")
     public Result<Void> updateKnowledgePointProgress(
-            @PathVariable Long studentId,
             @PathVariable Long knowledgePointId,
             @RequestBody KnowledgePointProgressUpdateDTO updateDTO) {
         try {
+            Long studentId = CurrentUserUtil.getCurrentUser().getId();
             studyProgressService.updateKnowledgePointProgress(studentId, knowledgePointId, updateDTO);
             return Result.ok();
         } catch (Exception e) {
@@ -195,11 +196,11 @@ public class StudyProgressController {
         }
     }
     
-    @GetMapping("/knowledge-points/{studentId}/{courseId}")
+    @GetMapping("/knowledge-points/course/{courseId}")
     public Result<List<Object>> getKnowledgePointProgress(
-            @PathVariable Long studentId,
             @PathVariable Long courseId) {
         try {
+            Long studentId = CurrentUserUtil.getCurrentUser().getId();
             List<Object> progress = studyProgressService.getKnowledgePointProgress(studentId, courseId);
             return Result.ok(progress);
         } catch (Exception e) {
@@ -208,10 +209,10 @@ public class StudyProgressController {
         }
     }
     
-    @GetMapping("/knowledge-points/{studentId}/review")
-    public Result<List<Object>> getKnowledgePointsNeedReview(
-            @PathVariable Long studentId) {
+    @GetMapping("/knowledge-points/review")
+    public Result<List<Object>> getKnowledgePointsNeedReview() {
         try {
+            Long studentId = CurrentUserUtil.getCurrentUser().getId();
             List<Object> knowledgePoints = studyProgressService.getKnowledgePointsNeedReview(studentId);
             return Result.ok(knowledgePoints);
         } catch (Exception e) {

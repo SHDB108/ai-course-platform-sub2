@@ -3,6 +3,7 @@ import com.example.aicourse.dto.student.StudentCreateDTO;
 import com.example.aicourse.dto.student.StudentUpdateDTO;
 import com.example.aicourse.entity.Student;
 import com.example.aicourse.service.StudentService;
+import com.example.aicourse.utils.CurrentUserUtil;
 import com.example.aicourse.utils.Result;
 import com.example.aicourse.vo.PageVO;
 import com.example.aicourse.vo.student.ImportResultVO;
@@ -195,13 +196,14 @@ public class StudentController{
      * @param keyword 搜索关键词
      * @return 学生课程列表
      */
-    @GetMapping("/{studentId}/courses")
+    @Deprecated
+    @GetMapping("/me/courses")
     public Result<PageVO<com.example.aicourse.vo.course.CourseVO>> getStudentCourses(
-            @PathVariable Long studentId,
             @RequestParam(defaultValue="1") Long pageNum,
             @RequestParam(defaultValue="10") Long pageSize,
             @RequestParam(required = false) String keyword) {
         try {
+            Long studentId = CurrentUserUtil.getCurrentUser().getId();
             PageVO<com.example.aicourse.vo.course.CourseVO> coursePage = service.getStudentCourses(studentId, pageNum, pageSize, keyword);
             return Result.ok(coursePage);
         } catch (RuntimeException e) {
@@ -218,14 +220,15 @@ public class StudentController{
      * @param status 任务状态筛选
      * @return 学生任务列表
      */
-    @GetMapping("/{studentId}/tasks")
+    @Deprecated
+    @GetMapping("/me/tasks")
     public Result<PageVO<com.example.aicourse.vo.task.StudentTaskVO>> getStudentTasks(
-            @PathVariable Long studentId,
             @RequestParam(defaultValue="1") Long pageNum,
             @RequestParam(defaultValue="10") Long pageSize,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String status) {
         try {
+            Long studentId = CurrentUserUtil.getCurrentUser().getId();
             PageVO<com.example.aicourse.vo.task.StudentTaskVO> taskPage = service.getStudentTasks(studentId, pageNum, pageSize, keyword, status);
             return Result.ok(taskPage);
         } catch (RuntimeException e) {
@@ -238,9 +241,11 @@ public class StudentController{
      * @param studentId 学生ID
      * @return 学生仪表板统计数据
      */
-    @GetMapping("/{studentId}/dashboard/stats")
-    public Result<StudentDashboardStatsVO> getStudentDashboardStats(@PathVariable Long studentId) {
+    @Deprecated
+    @GetMapping("/me/dashboard/stats")
+    public Result<StudentDashboardStatsVO> getStudentDashboardStats() {
         try {
+            Long studentId = CurrentUserUtil.getCurrentUser().getId();
             StudentDashboardStatsVO stats = service.getStudentDashboardStats(studentId);
             return Result.ok(stats);
         } catch (RuntimeException e) {
@@ -253,9 +258,11 @@ public class StudentController{
      * @param studentId 学生ID
      * @return 学生任务统计数据
      */
-    @GetMapping("/{studentId}/tasks/stats")
-    public Result<com.example.aicourse.vo.task.StudentTaskStatsVO> getStudentTaskStats(@PathVariable Long studentId) {
+    @Deprecated
+    @GetMapping("/me/tasks/stats")
+    public Result<com.example.aicourse.vo.task.StudentTaskStatsVO> getStudentTaskStats() {
         try {
+            Long studentId = CurrentUserUtil.getCurrentUser().getId();
             com.example.aicourse.vo.task.StudentTaskStatsVO stats = service.getStudentTaskStats(studentId);
             return Result.ok(stats);
         } catch (RuntimeException e) {

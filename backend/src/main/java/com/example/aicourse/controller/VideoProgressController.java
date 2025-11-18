@@ -37,8 +37,9 @@ public class VideoProgressController {
     /**
      * API 7.8 获取学生视频学习进度
      */
-    @GetMapping("/{resourceId}/progress/student/{studentId}")
-    public Result<VideoProgressVO> getProgress(@PathVariable Long resourceId, @PathVariable Long studentId) {
+    @GetMapping("/{resourceId}/progress")
+    public Result<VideoProgressVO> getProgress(@PathVariable Long resourceId) {
+        Long studentId = CurrentUserUtil.getCurrentUser().getId();
         VideoProgressVO vo = service.getStudentProgress(resourceId, studentId);
         return Result.ok(vo);
     }
@@ -49,17 +50,9 @@ public class VideoProgressController {
     @GetMapping("/course/{courseId}/statistics")
     public Result<List<VideoStudyStatisticsVO>> getStatistics(
             @PathVariable Long courseId,
-            @RequestParam(required = false) Long studentId) {
+            @RequestParam(defaultValue = "false") boolean personalView) {
+        Long studentId = personalView ? CurrentUserUtil.getCurrentUser().getId() : null;
         List<VideoStudyStatisticsVO> list = service.getCourseVideoStatistics(courseId, studentId);
         return Result.ok(list);
-    }
-
-    /**
-     * 获取当前用户ID的占位实现
-     * TODO: 应替换为从Spring Security等安全上下文中获取真实用户ID的逻辑
-     * @return 写死的ID 1L
-     */
-    private Long currentUserId() {
-        return 1L; // 占位符
     }
 }

@@ -1,15 +1,18 @@
 package com.example.aicourse.vo.analytics;
 
-import java.math.BigDecimal;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
- * API 10.6 知识点表现数据响应
+ * Lightweight VO describing knowledge-point mastery statistics.
  */
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class KnowledgePointPerformanceVO {
     private Long knowledgePointId;
     private String knowledgePointName;
-    private BigDecimal averageScore;
     private String masteryLevel;
+    private Double averageScore;
 }

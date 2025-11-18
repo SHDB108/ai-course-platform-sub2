@@ -1,10 +1,13 @@
 package com.example.aicourse.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.example.aicourse.client.AssessmentClient;
+import com.example.aicourse.client.KnowledgeGraphClient;
 import com.example.aicourse.dto.study.*;
 import com.example.aicourse.entity.*;
 import com.example.aicourse.repository.*;
 import com.example.aicourse.service.StudyProgressService;
+import com.example.aicourse.vo.exam.ExamStatisticsVO;
 import com.example.aicourse.vo.study.*;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,34 +29,25 @@ public class StudyProgressServiceImpl implements StudyProgressService {
     private final StudySessionMapper studySessionMapper;
     private final StudyPlanMapper studyPlanMapper;
     private final KnowledgePointProgressMapper knowledgePointProgressMapper;
-    private final CourseMapper courseMapper;
-    private final TaskMapper taskMapper;
-    private final VideoProgressMapper videoProgressMapper;
-    private final ExamMapper examMapper;
-    private final KnowledgePointMapper knowledgePointMapper;
     private final ObjectMapper objectMapper;
+    private final KnowledgeGraphClient knowledgeGraphClient;
+    private final AssessmentClient assessmentClient;
     
     @Autowired
     public StudyProgressServiceImpl(StudyProgressMapper studyProgressMapper,
                                    StudySessionMapper studySessionMapper,
                                    StudyPlanMapper studyPlanMapper,
                                    KnowledgePointProgressMapper knowledgePointProgressMapper,
-                                   CourseMapper courseMapper,
-                                   TaskMapper taskMapper,
-                                   VideoProgressMapper videoProgressMapper,
-                                   ExamMapper examMapper,
-                                   KnowledgePointMapper knowledgePointMapper,
-                                   ObjectMapper objectMapper) {
+                                   ObjectMapper objectMapper,
+                                   KnowledgeGraphClient knowledgeGraphClient,
+                                   AssessmentClient assessmentClient) {
         this.studyProgressMapper = studyProgressMapper;
         this.studySessionMapper = studySessionMapper;
         this.studyPlanMapper = studyPlanMapper;
         this.knowledgePointProgressMapper = knowledgePointProgressMapper;
-        this.courseMapper = courseMapper;
-        this.taskMapper = taskMapper;
-        this.videoProgressMapper = videoProgressMapper;
-        this.examMapper = examMapper;
-        this.knowledgePointMapper = knowledgePointMapper;
         this.objectMapper = objectMapper;
+        this.knowledgeGraphClient = knowledgeGraphClient;
+        this.assessmentClient = assessmentClient;
     }
     
     @Override
@@ -106,10 +100,9 @@ public class StudyProgressServiceImpl implements StudyProgressService {
         analysis.setCourseId(courseId);
         
         // 获取课程信息
-        Course course = courseMapper.selectById(courseId);
-        if (course != null) {
-            analysis.setCourseName(course.getCourseName());
-        }
+        knowledgeGraphClient.getCourse(courseId)
+                .map(Course::getCourseName)
+                .ifPresent(analysis::setCourseName);
         
         // 构建各种分析数据
         analysis.setTimeAnalysis(buildTimeAnalysis(studentId, courseId));
@@ -306,10 +299,8 @@ public class StudyProgressServiceImpl implements StudyProgressService {
             progress.setKnowledgePointId(knowledgePointId);
             
             // 获取知识点的课程ID
-            KnowledgePoint kp = knowledgePointMapper.selectById(knowledgePointId);
-            if (kp != null) {
-                progress.setCourseId(kp.getCourseId());
-            }
+            knowledgeGraphClient.getKnowledgePoint(knowledgePointId)
+                    .ifPresent(kp -> progress.setCourseId(kp.getCourseId()));
             
             progress.setMasteryLevel("LEARNING");
             progress.setStudyCount(0);
@@ -436,10 +427,25 @@ public class StudyProgressServiceImpl implements StudyProgressService {
     }
     
     private void calculateExamProgress(StudyProgress progress, Long studentId, Long courseId) {
-        // 这里需要实现考试进度计算逻辑
-        progress.setExamProgress(50);
-        progress.setCompletedExams(1);
-        progress.setTotalExams(2);
+        ExamStatisticsVO stats = assessmentClient.getStudentExamStatistics(studentId, courseId)
+                .orElse(null);
+        if (stats == null) {
+            progress.setExamProgress(0);
+            progress.setCompletedExams(0);
+            progress.setTotalExams(0);
+            return;
+        }
+
+        int total = Optional.ofNullable(stats.getTotalExams()).orElse(0);
+        int completed = Optional.ofNullable(stats.getCompletedExams()).orElse(0);
+        progress.setTotalExams(total);
+        progress.setCompletedExams(completed);
+
+        if (total > 0) {
+            progress.setExamProgress(completed * 100 / total);
+        } else {
+            progress.setExamProgress(0);
+        }
     }
     
     private void calculateKnowledgeProgress(StudyProgress progress, Long studentId, Long courseId) {
@@ -513,10 +519,9 @@ public class StudyProgressServiceImpl implements StudyProgressService {
         vo.setExpectedEndDate(progress.getExpectedEndDate());
         
         // 获取课程名称
-        Course course = courseMapper.selectById(progress.getCourseId());
-        if (course != null) {
-            vo.setCourseName(course.getCourseName());
-        }
+        knowledgeGraphClient.getCourse(progress.getCourseId())
+                .map(Course::getCourseName)
+                .ifPresent(vo::setCourseName);
         
         // 设置模块进度
         StudyProgressVO.ModuleProgress videoProgress = new StudyProgressVO.ModuleProgress();
@@ -594,10 +599,9 @@ public class StudyProgressServiceImpl implements StudyProgressService {
         vo.setBrowserInfo(session.getBrowserInfo());
         
         // 获取课程名称
-        Course course = courseMapper.selectById(session.getCourseId());
-        if (course != null) {
-            vo.setCourseName(course.getCourseName());
-        }
+        knowledgeGraphClient.getCourse(session.getCourseId())
+                .map(Course::getCourseName)
+                .ifPresent(vo::setCourseName);
         
         return vo;
     }
@@ -627,10 +631,9 @@ public class StudyProgressServiceImpl implements StudyProgressService {
         
         // 获取课程名称
         if (plan.getCourseId() != null) {
-            Course course = courseMapper.selectById(plan.getCourseId());
-            if (course != null) {
-                vo.setCourseName(course.getCourseName());
-            }
+            knowledgeGraphClient.getCourse(plan.getCourseId())
+                    .map(Course::getCourseName)
+                    .ifPresent(vo::setCourseName);
         }
         
         // 计算剩余天数
@@ -671,11 +674,10 @@ public class StudyProgressServiceImpl implements StudyProgressService {
         vo.put("reviewStatus", progress.getReviewStatus());
         
         // 获取知识点名称
-        KnowledgePoint kp = knowledgePointMapper.selectById(progress.getKnowledgePointId());
-        if (kp != null) {
+        knowledgeGraphClient.getKnowledgePoint(progress.getKnowledgePointId()).ifPresent(kp -> {
             vo.put("knowledgePointName", kp.getName());
             vo.put("knowledgePointDescription", kp.getDescription());
-        }
+        });
         
         return vo;
     }

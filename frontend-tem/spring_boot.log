@@ -1,18 +1,0 @@
-[INFO] Scanning for projects...
-Downloading from alimaven: https://maven.aliyun.com/repository/public/org/codehaus/mojo/maven-metadata.xml
-Downloading from alimaven: https://maven.aliyun.com/repository/public/org/apache/maven/plugins/maven-metadata.xml
-Progress (1): 5.1/21 kBProgress (2): 5.1/21 kB | 7.3/10 kBProgress (2): 5.1/21 kB | 10 kB    Progress (2): 21 kB | 10 kB                               Downloaded from alimaven: https://maven.aliyun.com/repository/public/org/codehaus/mojo/maven-metadata.xml (21 kB at 92 kB/s)
-Downloaded from alimaven: https://maven.aliyun.com/repository/public/org/apache/maven/plugins/maven-metadata.xml (10 kB at 46 kB/s)
-[INFO] ------------------------------------------------------------------------
-[INFO] BUILD FAILURE
-[INFO] ------------------------------------------------------------------------
-[INFO] Total time:  0.400 s
-[INFO] Finished at: 2025-07-12T02:40:11+08:00
-[INFO] ------------------------------------------------------------------------
-[ERROR] No plugin found for prefix 'spring-boot' in the current project and in the plugin groups [org.apache.maven.plugins, org.codehaus.mojo] available from the repositories [local (/Users/mm/.m2/repository), alimaven (https://maven.aliyun.com/repository/public)] -> [Help 1]
-[ERROR] 
-[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
-[ERROR] Re-run Maven using the -X switch to enable full debug logging.
-[ERROR] 
-[ERROR] For more information about the errors and possible solutions, please read the following articles:
-[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/NoPluginFoundForPrefixException

@@ -3,7 +3,6 @@ package com.example.aicourse.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.aicourse.dto.resource.ProgressDTO;
 import com.example.aicourse.entity.VideoProgress;
-import com.example.aicourse.repository.ResourceMapper;
 import com.example.aicourse.repository.VideoProgressMapper;
 import com.example.aicourse.service.VideoProgressService;
 import com.example.aicourse.vo.resource.VideoProgressVO;
@@ -16,23 +15,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 @Service
 public class VideoProgressServiceImpl implements VideoProgressService {
 
     private final VideoProgressMapper mapper;
-
     private final ObjectMapper objectMapper;
 
-    private final ResourceMapper resourceMapper;
-
     @Autowired
-    public VideoProgressServiceImpl(VideoProgressMapper mapper, ObjectMapper objectMapper, ResourceMapper resourceMapper) {
+    public VideoProgressServiceImpl(VideoProgressMapper mapper, ObjectMapper objectMapper) {
         this.mapper = mapper;
         this.objectMapper = objectMapper;
-        this.resourceMapper = resourceMapper;
     }
 
     @Override
@@ -87,16 +81,8 @@ public class VideoProgressServiceImpl implements VideoProgressService {
 
     @Override
     public List<VideoStudyStatisticsVO> getCourseVideoStatistics(Long courseId, Long studentId) {
-        // studentId 参数暂时未使用，当前逻辑为统计整个课程的情况。
-        // 如果需要针对单个学生统计，则需编写不同的或更复杂的SQL。
-
         List<VideoStudyStatisticsVO> stats = mapper.selectCourseVideoStatistics(courseId);
-
-        // 注意：热力图(heatmapData)的实现非常复杂，它需要解析和聚合每个视频进度中的
-        // progress JSON字段。这通常在数据库层面（需要较新版本的MySQL或PG）或在
-        // 服务层通过大量计算来完成。作为第一步，我们暂时返回一个空列表。
         stats.forEach(s -> s.setHeatmapData(new ArrayList<>()));
-
         return stats;
     }
 }

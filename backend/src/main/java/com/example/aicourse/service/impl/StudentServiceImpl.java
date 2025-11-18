@@ -5,24 +5,26 @@ import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.example.aicourse.client.AssessmentClient;
+import com.example.aicourse.client.KnowledgeGraphClient;
 import com.example.aicourse.dto.student.StudentCreateDTO;
 import com.example.aicourse.dto.student.StudentUpdateDTO;
-import com.example.aicourse.entity.Student;
-import com.example.aicourse.entity.User;
 import com.example.aicourse.entity.Course;
 import com.example.aicourse.entity.CourseStudent;
+import com.example.aicourse.entity.Student;
 import com.example.aicourse.entity.Teacher;
-import com.example.aicourse.repository.UserMapper;
+import com.example.aicourse.entity.User;
 import com.example.aicourse.repository.StudentMapper;
-import com.example.aicourse.repository.CourseMapper;
-import com.example.aicourse.repository.CourseStudentMapper;
-import com.example.aicourse.repository.TeacherMapper;
+import com.example.aicourse.repository.UserMapper;
 import com.example.aicourse.service.StudentService;
+import com.example.aicourse.vo.KnowledgeGraphVO;
+import com.example.aicourse.vo.MyDashboardVO;
 import com.example.aicourse.vo.PageVO;
-import com.example.aicourse.vo.student.ImportResultVO;
-import com.example.aicourse.vo.student.StudentVO;
-import com.example.aicourse.vo.student.StudentDashboardStatsVO;
+import com.example.aicourse.vo.analytics.StudentCoursePerformanceVO;
 import com.example.aicourse.vo.course.CourseVO;
+import com.example.aicourse.vo.student.ImportResultVO;
+import com.example.aicourse.vo.student.StudentDashboardStatsVO;
+import com.example.aicourse.vo.student.StudentVO;
 import com.example.aicourse.vo.task.StudentTaskVO;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,7 +43,10 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -49,19 +54,17 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper,Student> imple
 
     private final StudentMapper studentMapper;
     private final UserMapper userMapper;
-    private final CourseMapper courseMapper;
-    private final CourseStudentMapper courseStudentMapper;
-    private final TeacherMapper teacherMapper;
+    private final KnowledgeGraphClient knowledgeGraphClient;
+    private final AssessmentClient assessmentClient;
 
     @Autowired
-    public StudentServiceImpl(StudentMapper studentMapper, UserMapper userMapper, 
-                             CourseMapper courseMapper, CourseStudentMapper courseStudentMapper, 
-                             TeacherMapper teacherMapper) {
+    public StudentServiceImpl(StudentMapper studentMapper, UserMapper userMapper,
+                              KnowledgeGraphClient knowledgeGraphClient,
+                              AssessmentClient assessmentClient) {
         this.studentMapper = studentMapper;
         this.userMapper = userMapper;
-        this.courseMapper = courseMapper;
-        this.courseStudentMapper = courseStudentMapper;
-        this.teacherMapper = teacherMapper;
+        this.knowledgeGraphClient = knowledgeGraphClient;
+        this.assessmentClient = assessmentClient;
     }
 
     /**
@@ -360,9 +363,7 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper,Student> imple
         }
 
         // 2. 查询学生选修的课程ID列表
-        LambdaQueryWrapper<CourseStudent> enrollmentQueryWrapper = Wrappers.<CourseStudent>lambdaQuery()
-                .eq(CourseStudent::getStudentId, studentId);
-        List<CourseStudent> enrollments = courseStudentMapper.selectList(enrollmentQueryWrapper);
+        List<CourseStudent> enrollments = knowledgeGraphClient.findEnrollmentsByStudent(studentId);
         
         if (enrollments.isEmpty()) {
             // 如果学生没有选修任何课程，返回空结果
@@ -380,19 +381,8 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper,Student> imple
                 .collect(Collectors.toList());
 
         // 3. 构建课程查询条件（不分页，先获取所有数据）
-        LambdaQueryWrapper<Course> courseQueryWrapper = Wrappers.<Course>lambdaQuery()
-                .in(Course::getId, courseIds);
-        
-        // 如果有关键词搜索，添加搜索条件
-        if (StringUtils.isNotBlank(keyword)) {
-            courseQueryWrapper.and(wrapper -> wrapper
-                    .like(Course::getCourseName, keyword)
-                    .or()
-                    .like(Course::getCourseCode, keyword));
-        }
-
         // 先获取所有符合条件的课程
-        List<Course> allCourses = courseMapper.selectList(courseQueryWrapper);
+        List<Course> allCourses = knowledgeGraphClient.findCoursesByIds(courseIds, keyword);
         
         // 4. 手动分页
         int total = allCourses.size();
@@ -425,10 +415,9 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper,Student> imple
 
             // 填充教师姓名
             if (course.getTeacherId() != null) {
-                Teacher teacher = teacherMapper.selectById(course.getTeacherId());
-                if (teacher != null) {
-                    courseVO.setTeacherName(teacher.getName());
-                }
+                knowledgeGraphClient.getTeacher(course.getTeacherId())
+                        .map(Teacher::getName)
+                        .ifPresent(courseVO::setTeacherName);
             }
 
             return courseVO;
@@ -490,10 +479,8 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper,Student> imple
         StudentDashboardStatsVO stats = new StudentDashboardStatsVO();
         
         // 我的课程数量 - 查询学生选修的课程数
-        LambdaQueryWrapper<CourseStudent> courseQuery = Wrappers.lambdaQuery(CourseStudent.class)
-                .eq(CourseStudent::getStudentId, studentId);
-        Long courseCount = courseStudentMapper.selectCount(courseQuery);
-        stats.setMyCourses(courseCount != null ? courseCount.intValue() : 0);
+        long courseCount = knowledgeGraphClient.countEnrollmentsByStudent(studentId);
+        stats.setMyCourses((int) courseCount);
         
         // 待办任务数量 - 目前暂设为固定值，后续可根据实际任务表实现
         stats.setPendingTasks(3);
@@ -542,5 +529,120 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper,Student> imple
         stats.setThisMonthCompleted(12);
 
         return stats;
+    }
+
+    @Override
+    public MyDashboardVO getMyDashboardData(Long studentId) {
+        MyDashboardVO dashboard = new MyDashboardVO();
+
+        StudentDashboardStatsVO rawStats = getStudentDashboardStats(studentId);
+        dashboard.setStats(convertDashboardStats(rawStats));
+
+        com.example.aicourse.vo.task.StudentTaskStatsVO rawTaskStats = getStudentTaskStats(studentId);
+        dashboard.setTaskSummary(convertTaskStats(rawTaskStats));
+
+        List<CourseStudent> enrollments = knowledgeGraphClient.findEnrollmentsByStudent(studentId);
+        List<Long> courseIds = enrollments.stream()
+                .map(CourseStudent::getCourseId)
+                .distinct()
+                .collect(Collectors.toList());
+
+        List<Course> courses = courseIds.isEmpty()
+                ? Collections.emptyList()
+                : knowledgeGraphClient.findCoursesByIds(courseIds, null);
+        Map<Long, Course> courseMap = courses.stream()
+                .collect(Collectors.toMap(Course::getId, course -> course, (a, b) -> a));
+
+        List<MyDashboardVO.RecentCourseVO> recentCourses = courses.stream()
+                .limit(4)
+                .map(course -> {
+                    String teacherName = null;
+                    if (course.getTeacherId() != null) {
+                        teacherName = knowledgeGraphClient.getTeacher(course.getTeacherId())
+                                .map(Teacher::getName)
+                                .orElse(null);
+                    }
+                    return new MyDashboardVO.RecentCourseVO(
+                            course.getId(),
+                            course.getCourseName(),
+                            teacherName,
+                            null,
+                            course.getCredits(),
+                            course.getGmtCreate(),
+                            course.getGmtModified()
+                    );
+                })
+                .collect(Collectors.toList());
+        dashboard.setRecentCourses(recentCourses);
+
+        PageVO<StudentTaskVO> pendingPage = getStudentTasks(studentId, 1L, 5L, null, "NOT_SUBMITTED");
+        List<MyDashboardVO.UpcomingTaskVO> pendingTasks = Optional.ofNullable(pendingPage)
+                .map(PageVO::getRecords)
+                .orElse(Collections.emptyList())
+                .stream()
+                .map(task -> new MyDashboardVO.UpcomingTaskVO(
+                        task.getTaskId(),
+                        task.getTaskTitle(),
+                        task.getCourseName(),
+                        task.getDeadline(),
+                        task.getIsOverdue()
+                ))
+                .collect(Collectors.toList());
+        dashboard.setPendingTasks(pendingTasks);
+
+        List<MyDashboardVO.CourseProgressSummaryVO> progressSummary = courseIds.stream()
+                .limit(5)
+                .map(courseId -> {
+                    Double completionRate = assessmentClient.getStudentCoursePerformance(studentId, courseId)
+                            .map(StudentCoursePerformanceVO::getCompletionRate)
+                            .orElse(0.0);
+                    int percent = completionRate == null ? 0 : (int) Math.round(completionRate);
+                    String courseName = Optional.ofNullable(courseMap.get(courseId))
+                            .map(Course::getCourseName)
+                            .orElse(null);
+                    return new MyDashboardVO.CourseProgressSummaryVO(courseId, courseName, percent);
+                })
+                .collect(Collectors.toList());
+        dashboard.setProgressSummary(progressSummary);
+
+        return dashboard;
+    }
+
+    @Override
+    public KnowledgeGraphVO getCourseKnowledgeGraph(Long courseId) {
+        return knowledgeGraphClient.getCourseGraph(courseId);
+    }
+
+    private MyDashboardVO.DashboardStatsVO convertDashboardStats(StudentDashboardStatsVO raw) {
+        if (raw == null) {
+            return new MyDashboardVO.DashboardStatsVO();
+        }
+        MyDashboardVO.DashboardStatsVO stats = new MyDashboardVO.DashboardStatsVO();
+        stats.setMyCourses(raw.getMyCourses());
+        stats.setPendingTasks(raw.getPendingTasks());
+        stats.setWeeklySubmissions(raw.getWeeklySubmissions());
+        stats.setUnreadMessages(raw.getUnreadMessages());
+        stats.setProjects(raw.getProjects());
+        StudentDashboardStatsVO.TodoItemsVO todo = raw.getTodoItems();
+        if (todo != null) {
+            stats.setTodoItems(new MyDashboardVO.DashboardStatsVO.TodoItems(todo.getPending(), todo.getTotal()));
+        }
+        return stats;
+    }
+
+    private MyDashboardVO.TaskStatsVO convertTaskStats(com.example.aicourse.vo.task.StudentTaskStatsVO raw) {
+        if (raw == null) {
+            return new MyDashboardVO.TaskStatsVO();
+        }
+        MyDashboardVO.TaskStatsVO vo = new MyDashboardVO.TaskStatsVO();
+        vo.setTotalTasks(raw.getTotalTasks());
+        vo.setPendingTasks(raw.getPendingTasks());
+        vo.setInProgressTasks(raw.getInProgressTasks());
+        vo.setCompletedTasks(raw.getCompletedTasks());
+        vo.setOverdueTasks(raw.getOverdueTasks());
+        vo.setCompletionRate(raw.getCompletionRate());
+        vo.setThisWeekCompleted(raw.getThisWeekCompleted());
+        vo.setThisMonthCompleted(raw.getThisMonthCompleted());
+        return vo;
     }
 }

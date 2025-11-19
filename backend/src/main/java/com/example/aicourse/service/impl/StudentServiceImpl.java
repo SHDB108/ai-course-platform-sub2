@@ -21,6 +21,7 @@ import com.example.aicourse.vo.KnowledgeGraphVO;
 import com.example.aicourse.vo.MyDashboardVO;
 import com.example.aicourse.vo.PageVO;
 import com.example.aicourse.vo.analytics.StudentCoursePerformanceVO;
+import com.example.aicourse.vo.analytics.TaskCompletionSummaryVO;
 import com.example.aicourse.vo.course.CourseVO;
 import com.example.aicourse.vo.student.ImportResultVO;
 import com.example.aicourse.vo.student.StudentDashboardStatsVO;
@@ -401,7 +402,10 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper,Student> imple
 
             // 映射前端期望的字段
             courseVO.setName(course.getCourseName());
-            courseVO.setDuration(course.getHours());
+
+            Integer courseHours = course.getHours();
+            courseVO.setHours(courseHours);
+            courseVO.setDuration(courseHours == null ? null : courseHours * 45);
             courseVO.setMaxStudents(course.getCapacity());
             courseVO.setStatus("ACTIVE"); // 默认状态
 
@@ -446,22 +450,20 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper,Student> imple
             throw new RuntimeException("学生不存在");
         }
 
-        // TODO: 实现复杂的多表联查逻辑
-        // 需要查询：
-        // 1. 学生选修的课程
-        // 2. 这些课程下的所有任务
-        // 3. 学生对这些任务的提交状态
-        // 4. 根据keyword和status进行筛选
-        
-        // 暂时返回空结果，确保编译通过
-        PageVO<StudentTaskVO> pageVO = new PageVO<>();
-        pageVO.setRecords(new ArrayList<>());
-        pageVO.setTotal(0L);
-        pageVO.setSize(pageSize);
-        pageVO.setCurrent(pageNum);
-        pageVO.setPages(0L);
-        
-        return pageVO;
+        PageVO<StudentTaskVO> taskPage = assessmentClient.findStudentTasks(studentId, pageNum, pageSize, status);
+
+        if (taskPage == null) {
+            PageVO<StudentTaskVO> empty = new PageVO<>();
+            empty.setRecords(new ArrayList<>());
+            empty.setTotal(0L);
+            empty.setSize(pageSize == null ? 0L : pageSize);
+            empty.setCurrent(pageNum == null ? 1L : pageNum);
+            empty.setPages(0L);
+            return empty;
+        }
+
+        // TODO: 如果需要 keyword 过滤，应由 Assessment 子系统提供对应的查询能力
+        return taskPage;
     }
 
     /**
@@ -475,30 +477,27 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper,Student> imple
             throw new RuntimeException("学生不存在");
         }
 
-        // 2. 计算各项统计数据
         StudentDashboardStatsVO stats = new StudentDashboardStatsVO();
-        
-        // 我的课程数量 - 查询学生选修的课程数
-        long courseCount = knowledgeGraphClient.countEnrollmentsByStudent(studentId);
-        stats.setMyCourses((int) courseCount);
-        
-        // 待办任务数量 - 目前暂设为固定值，后续可根据实际任务表实现
-        stats.setPendingTasks(3);
-        
-        // 本周提交数量 - 目前暂设为固定值，后续可根据实际提交记录实现
-        stats.setWeeklySubmissions(5);
-        
-        // 未读消息数量 - 目前暂设为固定值，后续可根据实际消息表实现
-        stats.setUnreadMessages(2);
-        
-        // Todo项目统计
+
+        long enrolledCourses = knowledgeGraphClient.countEnrollmentsByStudent(studentId);
+        int myCourses = (int) Math.min(Integer.MAX_VALUE, enrolledCourses);
+        stats.setMyCourses(myCourses);
+
+        com.example.aicourse.vo.task.StudentTaskStatsVO taskStats = getStudentTaskStats(studentId);
+        int pendingTasks = taskStats.getPendingTasks() == null ? 0 : taskStats.getPendingTasks();
+        stats.setPendingTasks(pendingTasks);
+
+        int weeklyCompleted = taskStats.getThisWeekCompleted() == null ? 0 : taskStats.getThisWeekCompleted();
+        stats.setWeeklySubmissions(weeklyCompleted);
+
         StudentDashboardStatsVO.TodoItemsVO todoItems = new StudentDashboardStatsVO.TodoItemsVO();
-        todoItems.setPending(4);
-        todoItems.setTotal(10);
+        todoItems.setPending(pendingTasks);
+        todoItems.setTotal(taskStats.getTotalTasks() == null ? 0 : taskStats.getTotalTasks());
         stats.setTodoItems(todoItems);
-        
-        // 项目数量 - 目前暂设为固定值，后续可根据实际项目表实现
-        stats.setProjects(2);
+
+        // TODO: 等待消息/项目模块接入真实的未读消息与项目统计
+        stats.setUnreadMessages(0);
+        stats.setProjects(0);
 
         return stats;
     }
@@ -514,19 +513,76 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper,Student> imple
             throw new RuntimeException("学生不存在");
         }
 
-        // 2. 计算任务统计数据
         com.example.aicourse.vo.task.StudentTaskStatsVO stats = new com.example.aicourse.vo.task.StudentTaskStatsVO();
-        
-        // TODO: 实现真实的任务统计查询
-        // 目前返回模拟数据，后续需要根据实际的任务表实现
-        stats.setTotalTasks(20);
-        stats.setPendingTasks(3);
-        stats.setInProgressTasks(2);
-        stats.setCompletedTasks(15);
-        stats.setOverdueTasks(1);
-        stats.setCompletionRate(75.0);
-        stats.setThisWeekCompleted(4);
-        stats.setThisMonthCompleted(12);
+
+        List<CourseStudent> enrollments = knowledgeGraphClient.findEnrollmentsByStudent(studentId);
+        if (enrollments == null || enrollments.isEmpty()) {
+            stats.setTotalTasks(0);
+            stats.setPendingTasks(0);
+            stats.setInProgressTasks(0);
+            stats.setCompletedTasks(0);
+            stats.setOverdueTasks(0);
+            stats.setCompletionRate(0.0);
+            stats.setThisWeekCompleted(0);
+            stats.setThisMonthCompleted(0);
+            return stats;
+        }
+
+        int totalTasks = 0;
+        int completedTasks = 0;
+        int pendingTasks = 0;
+        double completionRateSum = 0.0;
+        int completionRateSamples = 0;
+
+        for (CourseStudent enrollment : enrollments) {
+            Long courseId = enrollment.getCourseId();
+            if (courseId == null) {
+                continue;
+            }
+
+            List<TaskCompletionSummaryVO> summaries = assessmentClient.getTaskCompletionSummary(courseId);
+            Optional<StudentCoursePerformanceVO> performanceOpt =
+                    assessmentClient.getStudentCoursePerformance(studentId, courseId);
+
+            Double completionRate = performanceOpt.map(StudentCoursePerformanceVO::getCompletionRate).orElse(null);
+            if (completionRate != null) {
+                completionRateSum += completionRate;
+                completionRateSamples++;
+            }
+
+            if (summaries == null || summaries.isEmpty()) {
+                continue;
+            }
+
+            int courseTaskCount = summaries.size();
+            totalTasks += courseTaskCount;
+
+            if (completionRate != null) {
+                int courseCompleted = (int) Math.round(courseTaskCount * (completionRate / 100.0));
+                courseCompleted = Math.max(0, Math.min(courseTaskCount, courseCompleted));
+                completedTasks += courseCompleted;
+                pendingTasks += courseTaskCount - courseCompleted;
+            } else {
+                pendingTasks += courseTaskCount;
+            }
+        }
+
+        stats.setTotalTasks(totalTasks);
+        stats.setCompletedTasks(completedTasks);
+        stats.setPendingTasks(pendingTasks);
+        // TODO: 需要 AssessmentClient 提供按学生聚合任务状态的接口以获取进行中、逾期等维度
+        stats.setInProgressTasks(0);
+        stats.setOverdueTasks(0);
+        stats.setThisWeekCompleted(0);
+        stats.setThisMonthCompleted(0);
+
+        if (totalTasks > 0) {
+            stats.setCompletionRate((completedTasks * 100.0) / totalTasks);
+        } else if (completionRateSamples > 0) {
+            stats.setCompletionRate(completionRateSum / completionRateSamples);
+        } else {
+            stats.setCompletionRate(0.0);
+        }
 
         return stats;
     }

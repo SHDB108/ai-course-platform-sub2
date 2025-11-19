@@ -6,11 +6,17 @@ import com.example.aicourse.client.KnowledgeGraphClient;
 import com.example.aicourse.dto.study.*;
 import com.example.aicourse.entity.*;
 import com.example.aicourse.repository.*;
+import com.example.aicourse.service.LlmService;
 import com.example.aicourse.service.StudyProgressService;
+import com.example.aicourse.service.VideoProgressService;
+import com.example.aicourse.vo.PageVO;
 import com.example.aicourse.vo.exam.ExamStatisticsVO;
 import com.example.aicourse.vo.study.*;
+import com.example.aicourse.vo.task.StudentTaskVO;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -24,6 +30,10 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class StudyProgressServiceImpl implements StudyProgressService {
+    private static final String KEY_TOTAL_VIDEOS = "totalVideos";
+    private static final String KEY_COMPLETED_VIDEOS = "completedVideos";
+    private static final String KEY_AVERAGE_PROGRESS = "averageProgress";
+    private static final long TASK_PAGE_SIZE = 200L;
     
     private final StudyProgressMapper studyProgressMapper;
     private final StudySessionMapper studySessionMapper;
@@ -32,6 +42,8 @@ public class StudyProgressServiceImpl implements StudyProgressService {
     private final ObjectMapper objectMapper;
     private final KnowledgeGraphClient knowledgeGraphClient;
     private final AssessmentClient assessmentClient;
+    private final VideoProgressService videoProgressService;
+    private final LlmService llmService;
     
     @Autowired
     public StudyProgressServiceImpl(StudyProgressMapper studyProgressMapper,
@@ -40,7 +52,9 @@ public class StudyProgressServiceImpl implements StudyProgressService {
                                    KnowledgePointProgressMapper knowledgePointProgressMapper,
                                    ObjectMapper objectMapper,
                                    KnowledgeGraphClient knowledgeGraphClient,
-                                   AssessmentClient assessmentClient) {
+                                   AssessmentClient assessmentClient,
+                                   VideoProgressService videoProgressService,
+                                   LlmService llmService) {
         this.studyProgressMapper = studyProgressMapper;
         this.studySessionMapper = studySessionMapper;
         this.studyPlanMapper = studyPlanMapper;
@@ -48,6 +62,8 @@ public class StudyProgressServiceImpl implements StudyProgressService {
         this.objectMapper = objectMapper;
         this.knowledgeGraphClient = knowledgeGraphClient;
         this.assessmentClient = assessmentClient;
+        this.videoProgressService = videoProgressService;
+        this.llmService = llmService;
     }
     
     @Override
@@ -266,22 +282,67 @@ public class StudyProgressServiceImpl implements StudyProgressService {
     
     @Override
     public StudyPlanVO generateAiStudyPlan(Long studentId, Long courseId, String planType) {
-        // 简化的AI学习计划生成
+        String normalizedPlanType = (planType == null || planType.isBlank())
+                ? "WEEKLY"
+                : planType.toUpperCase(Locale.ROOT);
+        String courseName = courseId == null
+                ? "当前课程"
+                : knowledgeGraphClient.getCourse(courseId)
+                        .map(Course::getCourseName)
+                        .orElse("当前课程");
+
+        String prompt = String.format("""
+你是一名智能学习规划助手，需要为学生制定 %s 课程的 %s 学习计划。
+请综合考虑课程目标、任务和常见难点，返回严格的JSON对象，字段包含：
+{
+  "goals": ["目标1","目标2","目标3"],
+  "milestones": [
+    {"title":"阶段名称","description":"关键学习内容","week":1,"deliverable":"需完成的成果"}
+  ],
+  "estimatedHours": 20,
+  "durationWeeks": 4,
+  "rationale": "计划总体说明"
+}
+仅输出JSON。
+""", courseName, normalizedPlanType);
+
+        StudyPlanContent content = null;
+        try {
+            content = llmService.generateJson(prompt, StudyPlanContent.class);
+        } catch (Exception e) {
+            log.warn("Failed to generate AI study plan via LLM for student {} course {}", studentId, courseId, e);
+        }
+        if (content == null) {
+            content = fallbackStudyPlanContent(courseName, normalizedPlanType);
+        }
+
         StudyPlan plan = new StudyPlan();
         plan.setStudentId(studentId);
         plan.setCourseId(courseId);
-        plan.setPlanName("AI智能学习计划 - " + planType);
-        plan.setDescription("基于您的学习情况智能生成的个性化学习计划");
-        plan.setPlanType(planType);
+        plan.setPlanType(normalizedPlanType);
+        plan.setPlanName(String.format("%s %s学习计划", courseName, normalizedPlanType));
+        plan.setDescription(Optional.ofNullable(content.getRationale()).orElse("AI生成的个性化学习计划"));
         plan.setStartDate(LocalDateTime.now());
-        plan.setTargetDate(LocalDateTime.now().plusWeeks(4)); // 默认4周计划
-        plan.setEstimatedHours(20);
+        int durationWeeks = Optional.ofNullable(content.getDurationWeeks())
+                .filter(value -> value > 0)
+                .orElse(getDefaultDurationWeeks(normalizedPlanType));
+        plan.setTargetDate(plan.getStartDate().plusWeeks(durationWeeks));
+        plan.setEndDate(plan.getTargetDate());
+        plan.setEstimatedHours(Optional.ofNullable(content.getEstimatedHours()).orElse(durationWeeks * 5));
         plan.setPriority("MEDIUM");
         plan.setStatus("ACTIVE");
         plan.setProgress(0);
+        plan.setCompletedTasks(0);
+        int milestoneCount = content.getMilestones() == null ? 0 : content.getMilestones().size();
+        plan.setTotalTasks(milestoneCount);
+        plan.setGoals(toJsonString(content.getGoals()));
+        plan.setMilestones(toJsonString(content.getMilestones()));
         plan.setIsAiGenerated(true);
-        plan.setAiRecommendReason("基于学习进度分析和知识点掌握情况生成");
+        plan.setAiRecommendReason("LLM根据最新学习进度生成的计划");
         plan.setLastAiUpdate(LocalDateTime.now());
+        plan.setReminderEnabled(false);
+        plan.setReminderFrequency(null);
+        plan.setReminderTime(null);
         
         studyPlanMapper.insert(plan);
         return convertToStudyPlanVO(plan);
@@ -299,8 +360,12 @@ public class StudyProgressServiceImpl implements StudyProgressService {
             progress.setKnowledgePointId(knowledgePointId);
             
             // 获取知识点的课程ID
-            knowledgeGraphClient.getKnowledgePoint(knowledgePointId)
-                    .ifPresent(kp -> progress.setCourseId(kp.getCourseId()));
+            Long kpCourseId = knowledgeGraphClient.getKnowledgePoint(knowledgePointId)
+                    .map(KnowledgePoint::getCourseId)
+                    .orElse(null);
+            if (kpCourseId != null) {
+                progress.setCourseId(kpCourseId);
+            }
             
             progress.setMasteryLevel("LEARNING");
             progress.setStudyCount(0);
@@ -412,18 +477,51 @@ public class StudyProgressServiceImpl implements StudyProgressService {
     }
     
     private void calculateVideoProgress(StudyProgress progress, Long studentId, Long courseId) {
-        // 这里需要实现视频进度计算逻辑
-        // 暂时设置为示例值
-        progress.setVideoProgress(75);
-        progress.setCompletedVideos(8);
-        progress.setTotalVideos(10);
+        Map<String, Integer> summary = videoProgressService.getStudentCourseProgressSummary(studentId, courseId);
+        int totalVideos = summary.getOrDefault(KEY_TOTAL_VIDEOS, 0);
+        int completedVideos = summary.getOrDefault(KEY_COMPLETED_VIDEOS, 0);
+        int averageProgress = summary.getOrDefault(KEY_AVERAGE_PROGRESS, 0);
+
+        progress.setTotalVideos(totalVideos);
+        progress.setCompletedVideos(completedVideos);
+        progress.setVideoProgress(averageProgress);
     }
     
     private void calculateTaskProgress(StudyProgress progress, Long studentId, Long courseId) {
-        // 这里需要实现任务进度计算逻辑
-        progress.setTaskProgress(60);
-        progress.setCompletedTasks(3);
-        progress.setTotalTasks(5);
+        List<StudentTaskVO> courseTasks = fetchStudentTasksForCourse(studentId, courseId);
+        int totalTasks = courseTasks.size();
+        int completedTasks = (int) courseTasks.stream()
+                .map(StudentTaskVO::getSubmissionStatus)
+                .filter(Objects::nonNull)
+                .filter(status -> "SUBMITTED".equalsIgnoreCase(status) || "GRADED".equalsIgnoreCase(status))
+                .count();
+
+        progress.setTotalTasks(totalTasks);
+        progress.setCompletedTasks(completedTasks);
+        progress.setTaskProgress(totalTasks > 0 ? (completedTasks * 100 / totalTasks) : 0);
+    }
+
+    private List<StudentTaskVO> fetchStudentTasksForCourse(Long studentId, Long courseId) {
+        List<StudentTaskVO> tasks = new ArrayList<>();
+        long currentPage = 1L;
+
+        while (true) {
+            PageVO<StudentTaskVO> page = assessmentClient.findStudentTasks(studentId, currentPage, TASK_PAGE_SIZE, null);
+            if (page == null || page.getRecords() == null || page.getRecords().isEmpty()) {
+                break;
+            }
+            tasks.addAll(page.getRecords().stream()
+                    .filter(task -> Objects.equals(task.getCourseId(), courseId))
+                    .collect(Collectors.toList()));
+
+            long totalPages = page.getPages();
+            if ((totalPages > 0 && currentPage >= totalPages) || page.getRecords().size() < TASK_PAGE_SIZE) {
+                break;
+            }
+            currentPage++;
+        }
+
+        return tasks;
     }
     
     private void calculateExamProgress(StudyProgress progress, Long studentId, Long courseId) {
@@ -754,6 +852,65 @@ public class StudyProgressServiceImpl implements StudyProgressService {
         return analysis;
     }
     
+    private StudyPlanContent fallbackStudyPlanContent(String courseName, String planType) {
+        StudyPlanContent content = new StudyPlanContent();
+        content.setGoals(Arrays.asList(
+                "巩固" + courseName + "核心概念",
+                "完成关键练习任务",
+                "总结阶段性成果并复盘"
+        ));
+        List<StudyPlanContent.Milestone> milestones = new ArrayList<>();
+
+        StudyPlanContent.Milestone milestone1 = new StudyPlanContent.Milestone();
+        milestone1.setTitle("理解基础理论");
+        milestone1.setDescription("复习课程导学与核心章节，整理知识框架");
+        milestone1.setWeek(1);
+        milestone1.setDeliverable("输出知识结构思维导图");
+        milestones.add(milestone1);
+
+        StudyPlanContent.Milestone milestone2 = new StudyPlanContent.Milestone();
+        milestone2.setTitle("完成实践任务");
+        milestone2.setDescription("针对重点知识完成对应的实践或作业任务");
+        milestone2.setWeek(2);
+        milestone2.setDeliverable("提交课程要求的任务并记录难点");
+        milestones.add(milestone2);
+
+        StudyPlanContent.Milestone milestone3 = new StudyPlanContent.Milestone();
+        milestone3.setTitle("复盘与巩固");
+        milestone3.setDescription("整理错题，总结学习心得，并准备测验");
+        milestone3.setWeek(3);
+        milestone3.setDeliverable("完成一次自测并更新复习清单");
+        milestones.add(milestone3);
+
+        content.setMilestones(milestones);
+        content.setEstimatedHours(20);
+        content.setDurationWeeks(getDefaultDurationWeeks(planType));
+        content.setRationale("基于课程结构生成的通用学习规划，可按个人节奏调整。");
+        return content;
+    }
+
+    private int getDefaultDurationWeeks(String planType) {
+        if ("WEEKLY".equalsIgnoreCase(planType)) {
+            return 1;
+        }
+        if ("MONTHLY".equalsIgnoreCase(planType)) {
+            return 4;
+        }
+        return 4;
+    }
+
+    private String toJsonString(Object value) {
+        try {
+            if (value == null) {
+                return objectMapper.writeValueAsString(Collections.emptyList());
+            }
+            return objectMapper.writeValueAsString(value);
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to serialize study plan content", e);
+            return "[]";
+        }
+    }
+
     private List<String> generatePredictions(Long studentId, Long courseId) {
         return Arrays.asList(
                 "按当前进度，预计在2周内完成本课程",
@@ -768,5 +925,22 @@ public class StudyProgressServiceImpl implements StudyProgressService {
                 "重点关注薄弱知识点的练习",
                 "可以尝试制定详细的学习计划"
         );
+    }
+
+    @Data
+    public static class StudyPlanContent {
+        private List<String> goals;
+        private List<Milestone> milestones;
+        private Integer estimatedHours;
+        private Integer durationWeeks;
+        private String rationale;
+
+        @Data
+        public static class Milestone {
+            private String title;
+            private String description;
+            private Integer week;
+            private String deliverable;
+        }
     }
 }

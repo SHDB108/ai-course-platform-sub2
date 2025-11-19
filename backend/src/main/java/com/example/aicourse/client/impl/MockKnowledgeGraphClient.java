@@ -6,9 +6,11 @@ import com.example.aicourse.entity.CourseStudent;
 import com.example.aicourse.entity.KnowledgePoint;
 import com.example.aicourse.entity.Teacher;
 import com.example.aicourse.vo.KnowledgeGraphVO;
+import com.example.aicourse.vo.resource.ResourceVO;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -61,5 +63,28 @@ public class MockKnowledgeGraphClient implements KnowledgeGraphClient {
         graph.getEdges().add(new KnowledgeGraphVO.EdgeVO("kp2", "kp4", "Related"));
 
         return graph;
+    }
+
+    @Override
+    public List<ResourceVO> getCourseResources(Long courseId) {
+        ResourceVO intro = new ResourceVO();
+        intro.setId(5001L);
+        intro.setCourseId(courseId);
+        intro.setFilename("课程导学.mp4");
+        intro.setType("VIDEO");
+
+        ResourceVO lecture = new ResourceVO();
+        lecture.setId(5002L);
+        lecture.setCourseId(courseId);
+        lecture.setFilename("Transformer 架构详解.mp4");
+        lecture.setType("VIDEO");
+
+        ResourceVO lab = new ResourceVO();
+        lab.setId(5003L);
+        lab.setCourseId(courseId);
+        lab.setFilename("实践：实现自注意力模块.mp4");
+        lab.setType("VIDEO");
+
+        return Arrays.asList(intro, lecture, lab);
     }
 }

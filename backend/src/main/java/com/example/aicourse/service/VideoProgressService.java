@@ -5,6 +5,7 @@ import com.example.aicourse.vo.resource.VideoProgressVO;
 import com.example.aicourse.vo.resource.VideoStudyStatisticsVO;
 
 import java.util.List;
+import java.util.Map;
 
 public interface VideoProgressService {
     /**
@@ -21,4 +22,10 @@ public interface VideoProgressService {
      * 获取课程视频学习统计 (对应 API 7.9)
      */
     List<VideoStudyStatisticsVO> getCourseVideoStatistics(Long courseId, Long studentId);
+
+    /**
+     * 汇总学生在某课程下的视频学习进度。
+     * @return 包含 totalVideos/completedVideos/averageProgress 键的Map
+     */
+    Map<String, Integer> getStudentCourseProgressSummary(Long studentId, Long courseId);
 }

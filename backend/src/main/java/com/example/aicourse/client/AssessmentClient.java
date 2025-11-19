@@ -1,9 +1,11 @@
 package com.example.aicourse.client;
 
+import com.example.aicourse.vo.PageVO;
 import com.example.aicourse.vo.analytics.KnowledgePointPerformanceVO;
 import com.example.aicourse.vo.analytics.StudentCoursePerformanceVO;
 import com.example.aicourse.vo.analytics.TaskCompletionSummaryVO;
 import com.example.aicourse.vo.exam.ExamStatisticsVO;
+import com.example.aicourse.vo.task.StudentTaskVO;
 
 import java.util.List;
 import java.util.Optional;
@@ -37,4 +39,9 @@ public interface AssessmentClient {
      * 获取学生的考试/测验统计数据（考试进度、通过率等）。
      */
     Optional<ExamStatisticsVO> getStudentExamStatistics(Long studentId, Long courseId);
+
+    /**
+     * 查询学生的任务列表，支持分页和按状态过滤。
+     */
+    PageVO<StudentTaskVO> findStudentTasks(Long studentId, Long pageNum, Long pageSize, String status);
 }

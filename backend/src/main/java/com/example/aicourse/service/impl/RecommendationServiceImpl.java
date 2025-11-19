@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -150,7 +151,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             Wrappers.<KnowledgePointProgress>lambdaQuery()
                 .eq(KnowledgePointProgress::getStudentId, studentId)
                 .eq(KnowledgePointProgress::getCourseId, courseId)
-                .eq(KnowledgePointProgress::getMasteryLevel, "待加强")
+                .in(KnowledgePointProgress::getMasteryLevel, Arrays.asList("LEARNING", "PARTIAL"))
         );
         
         if (CollectionUtils.isEmpty(progressList)) {

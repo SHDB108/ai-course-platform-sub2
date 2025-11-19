@@ -5,6 +5,7 @@ import com.example.aicourse.entity.CourseStudent;
 import com.example.aicourse.entity.KnowledgePoint;
 import com.example.aicourse.entity.Teacher;
 import com.example.aicourse.vo.KnowledgeGraphVO;
+import com.example.aicourse.vo.resource.ResourceVO;
 
 import java.util.Collection;
 import java.util.List;
@@ -57,4 +58,9 @@ public interface KnowledgeGraphClient {
      * 获取课程的知识图谱结构（节点+边）。
      */
     KnowledgeGraphVO getCourseGraph(Long courseId);
+
+    /**
+     * 获取课程下的教学资源列表，供视频统计等功能使用。
+     */
+    List<ResourceVO> getCourseResources(Long courseId);
 }

@@ -38,7 +38,8 @@ This document summarizes every HTTP endpoint exposed by the “学习向导” (
         "name": "深度学习实践",
         "description": "项目式课程，包含 GNN/LLM 案例。",
         "credits": 3,
-        "duration": 48,
+        "hours": 48,
+        "duration": 2160,
         "teacherName": "李老师",
         "status": "ACTIVE",
         "startDate": "2025-03-01",
@@ -54,6 +55,10 @@ This document summarizes every HTTP endpoint exposed by the “学习向导” (
   }
 }
 ```
+
+> **Notes**
+> - `hours` 表示课程总课时。
+> - `duration` 以分钟为单位（内部按 `hours * 45` 计算，符合最新后端实现）。
 
 ### 1.2 获取学生任务列表
 - **Method**: `GET`

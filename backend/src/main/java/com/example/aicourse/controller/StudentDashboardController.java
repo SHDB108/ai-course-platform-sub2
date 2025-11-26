@@ -10,7 +10,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 聚合后的“学习数据驾驶舱”接口，前端仅需一次请求即可获取首页所需全部卡片数据。
+ * Student Dashboard Controller.
+ * Aggregates data for the student's "Learning Cockpit".
  */
 @RestController
 @RequestMapping("/api/v1/student")
@@ -23,7 +24,8 @@ public class StudentDashboardController {
         this.studentService = studentService;
     }
 
-    @GetMapping("/my-dashboard")
+    // FIXED: Changed path from "/my-dashboard" to "/dashboard/my" to match frontend request
+    @GetMapping("/dashboard/my")
     public Result<MyDashboardVO> getMyDashboard() {
         Long studentId = CurrentUserUtil.getCurrentUser().getId();
         MyDashboardVO data = studentService.getMyDashboardData(studentId);

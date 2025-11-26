@@ -5,6 +5,9 @@ import com.example.aicourse.entity.LearningRecommendation;
 import com.example.aicourse.vo.knowledge.LearningRecommendationVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.Results;
+import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
 
@@ -18,6 +21,29 @@ public interface LearningRecommendationMapper extends BaseMapper<LearningRecomme
      * @param count 限制查询的数量
      * @return 包含完整信息的学习推荐VO列表
      */
+    @Select("SELECT " +
+            "r.id AS id, " +
+            "r.recommendation_type AS recommendationType, " +
+            "r.target_id AS targetId, " +
+            "r.reason AS reason, " +
+            "CASE " +
+            "  WHEN r.recommendation_type = 'KNOWLEDGE_POINT' THEN kp.name " +
+            "  ELSE '未知目标' " +
+            "END AS targetName " +
+            "FROM t_learning_recommendation r " +
+            "LEFT JOIN t_knowledge_point kp ON r.target_id = kp.id AND r.recommendation_type = 'KNOWLEDGE_POINT' " +
+            "WHERE r.student_id = #{studentId} " +
+            "  AND r.course_id = #{courseId} " +
+            "  AND r.is_dismissed = 0 " +
+            "ORDER BY r.gmt_create DESC " +
+            "LIMIT #{limit}")
+    @Results({
+            @Result(property = "id", column = "id"),
+            @Result(property = "recommendationType", column = "recommendationType"),
+            @Result(property = "targetId", column = "targetId"),
+            @Result(property = "reason", column = "reason"),
+            @Result(property = "targetName", column = "targetName")
+    })
     List<LearningRecommendationVO> selectEnrichedRecommendations(
             @Param("studentId") Long studentId,
             @Param("courseId") Long courseId,

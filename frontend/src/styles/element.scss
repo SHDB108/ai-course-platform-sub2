@@ -1,0 +1,111 @@
+// Element Plus Theme Overrides
+// Azure/Sky Blue/Navy Theme
+
+@use './variables.scss' as *;
+
+// Primary color overrides
+:root {
+  --el-color-primary: #{$primary-color};
+  --el-color-primary-light-3: #{$primary-light};
+  --el-color-primary-light-5: #73b8ff;
+  --el-color-primary-light-7: #a6d4ff;
+  --el-color-primary-light-8: #c9e6ff;
+  --el-color-primary-light-9: #e6f4ff;
+  --el-color-primary-dark-2: #{$primary-dark};
+
+  --el-color-success: #{$success-color};
+  --el-color-warning: #{$warning-color};
+  --el-color-danger: #{$error-color};
+  --el-color-info: #{$info-color};
+
+  --el-border-radius-base: #{$border-radius-md};
+  --el-border-radius-small: #{$border-radius-sm};
+  --el-border-radius-round: #{$border-radius-lg};
+}
+
+// Menu customization
+.el-menu {
+  border-right: none;
+
+  &.sidebar-menu {
+    background-color: $navy-blue;
+
+    .el-menu-item {
+      color: rgba(255, 255, 255, 0.65);
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.08);
+        color: $white;
+      }
+
+      &.is-active {
+        background-color: $primary-color;
+        color: $white;
+      }
+    }
+  }
+}
+
+// Card customization
+.el-card {
+  border-radius: $border-radius-lg;
+  border: 1px solid $border-color;
+  box-shadow: $shadow-sm;
+
+  &:hover {
+    box-shadow: $shadow-md;
+  }
+}
+
+// Button customization
+.el-button--primary {
+  background-color: $primary-color;
+  border-color: $primary-color;
+
+  &:hover,
+  &:focus {
+    background-color: $primary-light;
+    border-color: $primary-light;
+  }
+
+  &:active {
+    background-color: $primary-dark;
+    border-color: $primary-dark;
+  }
+}
+
+// Table customization
+.el-table {
+  --el-table-header-bg-color: #fafafa;
+  --el-table-row-hover-bg-color: #f5f7fa;
+
+  th.el-table__cell {
+    font-weight: 600;
+    color: $text-primary;
+  }
+}
+
+// Progress bar customization
+.el-progress-bar__outer {
+  border-radius: $border-radius-md;
+}
+
+.el-progress-bar__inner {
+  border-radius: $border-radius-md;
+}
+
+// Dropdown customization
+.el-dropdown-menu {
+  border-radius: $border-radius-md;
+  box-shadow: $shadow-md;
+}
+
+// Avatar customization
+.el-avatar {
+  background-color: $primary-color;
+}
+
+// Message customization
+.el-message {
+  border-radius: $border-radius-md;
+}

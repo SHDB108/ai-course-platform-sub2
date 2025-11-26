@@ -1,0 +1,33 @@
+# Development Profile Configuration
+# This file is automatically loaded when spring.profiles.active=dev
+
+# You can override specific settings here for development environment
+# For example:
+
+# spring:
+#   datasource:
+#     url: jdbc:mysql://localhost:3306/aicourse_dev?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+#     username: root
+#     password: 123456
+
+# Optionally enable SQL logging in development
+mybatis-plus:
+  configuration:
+    # Show SQL statements in console (useful for debugging)
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# Logging configuration for development
+logging:
+  level:
+    com.example.aicourse: DEBUG
+    # com.example.aicourse.repository: DEBUG  # Uncomment to see MyBatis SQL logs
+
+# Subsystem API URLs (Dummy values to satisfy @Value injection in REST clients)
+# These are not used in dev profile since we use LocalDatabase clients instead
+subsystem1:
+  api:
+    url: http://localhost:8080
+
+subsystem3:
+  api:
+    url: http://localhost:8080

@@ -32,6 +32,7 @@ public class MyDashboardVO {
         private Integer unreadMessages;
         private Integer projects;
         private TodoItems todoItems;
+        private List<CapabilityScoreVO> capabilityRadar;
 
         @Data
         @NoArgsConstructor
@@ -40,6 +41,16 @@ public class MyDashboardVO {
             private Integer pending;
             private Integer total;
         }
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CapabilityScoreVO {
+        /** 能力维度名称 */
+        private String dimension;
+        /** 该维度的得分 */
+        private Double score;
     }
 
     @Data

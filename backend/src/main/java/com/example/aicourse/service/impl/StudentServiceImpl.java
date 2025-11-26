@@ -16,6 +16,7 @@ import com.example.aicourse.entity.Teacher;
 import com.example.aicourse.entity.User;
 import com.example.aicourse.repository.StudentMapper;
 import com.example.aicourse.repository.UserMapper;
+import com.example.aicourse.service.CapabilityService;
 import com.example.aicourse.service.StudentService;
 import com.example.aicourse.vo.KnowledgeGraphVO;
 import com.example.aicourse.vo.MyDashboardVO;
@@ -57,15 +58,18 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper,Student> imple
     private final UserMapper userMapper;
     private final KnowledgeGraphClient knowledgeGraphClient;
     private final AssessmentClient assessmentClient;
+    private final CapabilityService capabilityService;
 
     @Autowired
     public StudentServiceImpl(StudentMapper studentMapper, UserMapper userMapper,
                               KnowledgeGraphClient knowledgeGraphClient,
-                              AssessmentClient assessmentClient) {
+                              AssessmentClient assessmentClient,
+                              CapabilityService capabilityService) {
         this.studentMapper = studentMapper;
         this.userMapper = userMapper;
         this.knowledgeGraphClient = knowledgeGraphClient;
         this.assessmentClient = assessmentClient;
+        this.capabilityService = capabilityService;
     }
 
     /**
@@ -592,7 +596,14 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper,Student> imple
         MyDashboardVO dashboard = new MyDashboardVO();
 
         StudentDashboardStatsVO rawStats = getStudentDashboardStats(studentId);
-        dashboard.setStats(convertDashboardStats(rawStats));
+        MyDashboardVO.DashboardStatsVO stats = convertDashboardStats(rawStats);
+
+        // 计算并设置能力雷达数据
+        List<MyDashboardVO.CapabilityScoreVO> capabilityRadar =
+                capabilityService.calculateAndGetCapabilityScores(studentId);
+        stats.setCapabilityRadar(capabilityRadar);
+
+        dashboard.setStats(stats);
 
         com.example.aicourse.vo.task.StudentTaskStatsVO rawTaskStats = getStudentTaskStats(studentId);
         dashboard.setTaskSummary(convertTaskStats(rawTaskStats));
@@ -683,6 +694,7 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper,Student> imple
         if (todo != null) {
             stats.setTodoItems(new MyDashboardVO.DashboardStatsVO.TodoItems(todo.getPending(), todo.getTotal()));
         }
+        // Note: capabilityRadar will be set separately in getMyDashboardData
         return stats;
     }
 

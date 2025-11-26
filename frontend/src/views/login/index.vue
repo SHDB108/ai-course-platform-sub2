@@ -49,14 +49,6 @@
           </el-button>
         </el-form-item>
       </el-form>
-
-      <div class="login-footer">
-        <el-divider>Demo Accounts</el-divider>
-        <div class="demo-accounts">
-          <el-tag type="info" @click="fillDemoAccount('student')">Student: student / mock-password</el-tag>
-          <el-tag type="success" @click="fillDemoAccount('teacher')">Teacher: teacher / mock-password</el-tag>
-        </div>
-      </div>
     </el-card>
   </div>
 </template>
@@ -126,16 +118,6 @@ const handleLogin = async () => {
     loading.value = false
   }
 }
-
-const fillDemoAccount = (type: 'student' | 'teacher') => {
-  if (type === 'student') {
-    loginForm.username = 'student'
-    loginForm.password = 'mock-password'
-  } else {
-    loginForm.username = 'teacher'
-    loginForm.password = 'mock-password'
-  }
-}
 </script>
 
 <style scoped lang="scss">
@@ -186,30 +168,5 @@ const fillDemoAccount = (type: 'student' | 'teacher') => {
 .login-button {
   width: 100%;
   margin-top: 10px;
-}
-
-.login-footer {
-  margin-top: 20px;
-
-  :deep(.el-divider__text) {
-    font-size: 12px;
-    color: #909399;
-  }
-
-  .demo-accounts {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    align-items: center;
-
-    .el-tag {
-      cursor: pointer;
-      transition: transform 0.2s;
-
-      &:hover {
-        transform: scale(1.05);
-      }
-    }
-  }
 }
 </style>

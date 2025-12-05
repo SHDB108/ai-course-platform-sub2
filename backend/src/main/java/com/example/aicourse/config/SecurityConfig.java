@@ -45,7 +45,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/register/**",
-                                "/api/v1/auth/forgot-password/**"
+                                "/api/v1/auth/forgot-password/**",
+                                "/files/**"
                         ).permitAll()
 
                         // === 管理员权限 ===
@@ -57,7 +58,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/courses/**", "/api/v1/tasks/**", "/api/v1/questions/**").hasRole("TEACHER")
                         .requestMatchers(HttpMethod.DELETE, "/courses/**", "/api/v1/tasks/**", "/api/v1/questions/**", "/api/v1/papers/**").hasRole("TEACHER")
                         // 教师可以管理资源和查看分析数据
-                        .requestMatchers("/api/v1/resources/**", "/api/v1/analytics/**").hasRole("TEACHER")
+                        .requestMatchers("/api/v1/resources/**").hasAnyRole("TEACHER", "STUDENT")
+                        .requestMatchers("/api/v1/analytics/**").hasRole("TEACHER")
 
                         // === 学生权限 ===
                         // 学生可以选课、退课、提交任务/测验、上报视频进度

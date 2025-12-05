@@ -78,8 +78,25 @@ const mockRecommendations: LearningRecommendationVO[] = [
 
 const USE_MOCK = false
 
-// Get all recommendations for current student
-export const getRecommendations = (): Promise<Result<LearningRecommendationVO[]>> => {
+// Generate AI recommendations for a specific course
+export const generateRecommendations = (courseId: number): Promise<Result<string>> => {
+  if (USE_MOCK) {
+    console.log('Mock generating recommendations for course:', courseId)
+    return Promise.resolve({
+      code: 0,
+      msg: 'AI recommendations generated successfully',
+      data: 'success'
+    })
+  }
+
+  return request({
+    url: `/v1/recommendations/my-recommendations?courseId=${courseId}`,
+    method: 'post'
+  })
+}
+
+// Get all recommendations for current student (optionally filtered by course)
+export const getRecommendations = (courseId?: number): Promise<Result<LearningRecommendationVO[]>> => {
   if (USE_MOCK) {
     return Promise.resolve({
       code: 0,
@@ -88,8 +105,12 @@ export const getRecommendations = (): Promise<Result<LearningRecommendationVO[]>
     })
   }
 
+  const url = courseId
+    ? `/v1/recommendations?courseId=${courseId}`
+    : '/v1/recommendations'
+
   return request({
-    url: '/v1/recommendations',
+    url,
     method: 'get'
   })
 }

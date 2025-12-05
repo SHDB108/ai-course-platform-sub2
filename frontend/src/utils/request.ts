@@ -39,6 +39,16 @@ service.interceptors.response.use(
     return res
   },
   (error) => {
+    // Log detailed error information for debugging
+    console.error('=== API Error Details ===')
+    console.error('Status:', error.response?.status)
+    console.error('Status Text:', error.response?.statusText)
+    console.error('Response Data:', error.response?.data)
+    console.error('Request URL:', error.config?.url)
+    console.error('Request Method:', error.config?.method)
+    console.error('Full Error:', error)
+    console.error('========================')
+
     // Handle 401 Unauthorized - redirect to login
     if (error.response?.status === 401) {
       localStorage.removeItem('token')
@@ -48,7 +58,13 @@ service.interceptors.response.use(
       window.location.href = '/login'
       return Promise.reject(error)
     }
-    ElMessage.error(error.message || 'Network error')
+
+    // Show user-friendly error message
+    const errorMessage = error.response?.data?.msg ||
+                        error.response?.data?.message ||
+                        error.message ||
+                        'Network error'
+    ElMessage.error(errorMessage)
     return Promise.reject(error)
   }
 )

@@ -23,6 +23,7 @@ public class KnowledgeGraphVO {
         private String id;
         private String name;
         private Integer category;
+        private String masteryLevel;
     }
 
     @Data

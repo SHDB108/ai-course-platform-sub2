@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -16,35 +17,36 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Slf4j
-// @Service  // Disabled: Using OllamaLlmServiceImpl instead
-public class DifyLlmServiceImpl implements LlmService {
+@Primary
+@Service
+public class OllamaLlmServiceImpl implements LlmService {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
-    @Value("${llm.dify.api-url}")
-    private String difyApiUrl;
+    @Value("${llm.ollama.api-url}")
+    private String ollamaApiUrl;
 
-    @Value("${llm.dify.api-key}")
-    private String difyApiKey;
+    @Value("${llm.ollama.model}")
+    private String ollamaModel;
 
     @Autowired
-    public DifyLlmServiceImpl(RestTemplate restTemplate, ObjectMapper objectMapper) {
+    public OllamaLlmServiceImpl(RestTemplate restTemplate, ObjectMapper objectMapper) {
         this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
     }
 
     @Override
     public String generateText(String prompt) {
-        String jsonResponse = callDifyApi(prompt, "text");
+        String jsonResponse = callOllamaApi(prompt, false);
         try {
-            Map<String, Object> difyWrapper = objectMapper.readValue(jsonResponse, new TypeReference<>() {});
+            Map<String, Object> ollamaResponse = objectMapper.readValue(jsonResponse, new TypeReference<>() {});
 
-            // Dify uses "answer" field, not "response"
-            Object answerObj = difyWrapper.get("answer");
-            return answerObj != null ? answerObj.toString() : "";
+            // Ollama uses "response" field
+            Object responseObj = ollamaResponse.get("response");
+            return responseObj != null ? responseObj.toString() : "";
         } catch (Exception e) {
-            log.error("解析Dify的文本响应失败: {}", jsonResponse, e);
+            log.error("解析Ollama的文本响应失败: {}", jsonResponse, e);
             return "抱歉，AI助教暂时无法生成建议，请稍后重试。"; // Fallback response
         }
     }
@@ -55,7 +57,7 @@ public class DifyLlmServiceImpl implements LlmService {
         try {
             return objectMapper.readValue(actualJson, responseType);
         } catch (Exception e) {
-            log.error("解析Dify的JSON响应失败: {}", actualJson, e);
+            log.error("解析Ollama的JSON响应失败: {}", actualJson, e);
             throw new RuntimeException("解析LLM的JSON响应失败。", e);
         }
     }
@@ -66,25 +68,24 @@ public class DifyLlmServiceImpl implements LlmService {
         try {
             return objectMapper.readValue(actualJson, responseType);
         } catch (Exception e) {
-            log.error("解析Dify的泛型JSON响应失败: {}", actualJson, e);
+            log.error("解析Ollama的泛型JSON响应失败: {}", actualJson, e);
             throw new RuntimeException("解析LLM的泛型JSON响应失败。", e);
         }
     }
 
     private String getInnerJsonResponse(String prompt) {
-        String jsonResponse = callDifyApi(prompt, "json");
+        String jsonResponse = callOllamaApi(prompt, true);
         try {
-            Map<String, Object> difyWrapper = objectMapper.readValue(jsonResponse, new TypeReference<>() {});
+            Map<String, Object> ollamaResponse = objectMapper.readValue(jsonResponse, new TypeReference<>() {});
 
-            // Dify uses "answer" field, not "response"
-            Object answerObj = difyWrapper.get("answer");
-            return answerObj != null ? answerObj.toString() : "{}";
+            // Ollama uses "response" field
+            Object responseObj = ollamaResponse.get("response");
+            return responseObj != null ? responseObj.toString() : "{}";
         } catch (Exception e) {
-            log.error("从Dify响应中提取内部JSON失败: {}", jsonResponse, e);
+            log.error("从Ollama响应中提取内部JSON失败: {}", jsonResponse, e);
             throw new RuntimeException("从LLM响应中提取内部JSON失败。", e);
         }
     }
-
 
     @Override
     public IntelligentGradeResultVO gradeShortAnswer(String studentAnswer, String referenceAnswer) {
@@ -100,46 +101,45 @@ public class DifyLlmServiceImpl implements LlmService {
     }
 
     /**
-     * 调用Dify Chat Completion API
-     * 按照Dify规范构造请求体和请求头
+     * 调用Ollama API
+     * 按照Ollama规范构造请求体和请求头
+     * @param prompt 提示词
+     * @param jsonFormat 是否要求返回JSON格式
+     * @return Ollama API的响应字符串
      */
-    private String callDifyApi(String prompt, String format) {
-        // 1. 构造请求头：必须包含 Authorization: Bearer <api-key>
+    private String callOllamaApi(String prompt, boolean jsonFormat) {
+        // 1. 构造请求头：Content-Type: application/json
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("Authorization", "Bearer " + difyApiKey);
 
-        // 2. 构造Dify规范的请求体
+        // 2. 构造Ollama规范的请求体
         Map<String, Object> body = new HashMap<>();
-        body.put("inputs", new HashMap<>()); // 空inputs对象
-        body.put("query", prompt);           // 用户的prompt
-        body.put("response_mode", "blocking"); // 阻塞模式，等待完整响应
-        body.put("user", "student-default"); // 用户标识，可以用学生ID替换
+        body.put("model", ollamaModel);        // 模型名称
+        body.put("prompt", prompt);            // 用户的prompt
+        body.put("stream", false);             // 关键！阻塞模式，等待完整响应
 
-        // 如果需要JSON格式输出，可以在prompt中说明，或者通过inputs传递参数
-        // Dify的Chat Completion API通常没有format参数，通过prompt引导
-        if ("json".equals(format)) {
-            // 在prompt中增加JSON格式要求的提示
-            body.put("query", prompt + "\n\n请严格按照JSON格式返回结果。");
+        // 如果需要JSON格式输出，设置format参数
+        if (jsonFormat) {
+            body.put("format", "json");
         }
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
         try {
-            log.info("正在向Dify API发送请求: {}", difyApiUrl);
+            log.info("正在向Ollama API发送请求: {}, 模型: {}", ollamaApiUrl, ollamaModel);
             log.debug("请求体: {}", body);
 
-            ResponseEntity<String> response = restTemplate.postForEntity(difyApiUrl, entity, String.class);
+            ResponseEntity<String> response = restTemplate.postForEntity(ollamaApiUrl, entity, String.class);
 
             if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
-                log.debug("Dify API响应: {}", response.getBody());
+                log.debug("Ollama API响应: {}", response.getBody());
                 return response.getBody();
             } else {
-                log.error("Dify API调用失败，状态码: {}，响应体: {}", response.getStatusCode(), response.getBody());
+                log.error("Ollama API调用失败，状态码: {}，响应体: {}", response.getStatusCode(), response.getBody());
                 throw new RuntimeException("LLM API调用失败，状态码: " + response.getStatusCode());
             }
         } catch (Exception e) {
-            log.error("调用Dify LLM服务时出错，API URL: {}", difyApiUrl, e);
+            log.error("调用Ollama LLM服务时出错，API URL: {}, 模型: {}", ollamaApiUrl, ollamaModel, e);
             throw new RuntimeException("调用LLM服务时出错: " + e.getMessage(), e);
         }
     }

@@ -36,7 +36,7 @@ const mockGraphData: KnowledgeGraphVO = {
   ]
 }
 
-const USE_MOCK = import.meta.env.DEV
+const USE_MOCK = false
 
 // Get course knowledge graph
 export const getCourseGraph = (courseId: number): Promise<Result<KnowledgeGraphVO>> => {
@@ -89,6 +89,19 @@ export const getCourseDetail = (courseId: number): Promise<Result<CourseDetailVO
 
   return request({
     url: `/v1/courses/${courseId}`,
+    method: 'get'
+  })
+}
+
+// Get student's enrolled courses
+export interface StudentCoursesResponse {
+  records: CourseDetailVO[]
+  total: number
+}
+
+export const getStudentCourses = (): Promise<Result<StudentCoursesResponse>> => {
+  return request({
+    url: '/v1/students/me/courses',
     method: 'get'
   })
 }

@@ -46,7 +46,10 @@ public class KnowledgePointProgress {
     private Integer reviewInterval;         // 复习间隔(天)
     private Integer reviewCount;            // 复习次数
     private String reviewStatus;            // 复习状态: SCHEDULED, OVERDUE, COMPLETED
-    
+
+    // 学习笔记
+    private String notes;                   // 学习笔记
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime gmtCreate;
     

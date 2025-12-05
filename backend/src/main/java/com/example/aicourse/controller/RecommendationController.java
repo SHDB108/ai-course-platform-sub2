@@ -34,7 +34,7 @@ public class RecommendationController {
     @GetMapping
     @PreAuthorize("hasRole('STUDENT')")
     public Result<List<LearningRecommendationVO>> getMyRecommendations(
-            @RequestParam Long courseId,
+            @RequestParam(required = false) Long courseId,
             @RequestParam(required = false) String type,
             @RequestParam(required = false, defaultValue = "5") Integer count) {
 

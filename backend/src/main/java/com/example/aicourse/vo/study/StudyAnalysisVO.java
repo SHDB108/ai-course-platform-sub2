@@ -24,9 +24,12 @@ public class StudyAnalysisVO {
     
     // 知识点掌握分析
     private KnowledgeAnalysis knowledgeAnalysis;
-    
+
     // 学习行为分析
     private BehaviorAnalysis behaviorAnalysis;
+
+    // 学生能力雷达图数据
+    private List<CapabilityStats> capabilityRadar;
     
     // 预测和建议
     private List<String> predictions;
@@ -104,5 +107,18 @@ public class StudyAnalysisVO {
         private Integer attemptCount;
         private Double successRate;
         private String recommendedAction;
+    }
+
+    /**
+     * 能力维度统计
+     * 用于学生能力模型雷达图展示
+     */
+    @Data
+    public static class CapabilityStats {
+        private String ability;              // 能力维度: THEORY, PRACTICE, LOGIC, INNOVATION
+        private String abilityName;          // 能力维度中文名称
+        private Integer totalPoints;         // 该能力维度的总知识点数
+        private Integer masteredPoints;      // 该能力维度已掌握的知识点数
+        private Double masteryRate;          // 掌握率 (masteredPoints / totalPoints * 100)
     }
 }

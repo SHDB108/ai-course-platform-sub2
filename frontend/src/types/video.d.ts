@@ -21,12 +21,14 @@ export interface VideoProgressSaveDTO {
 
 // Video resource info
 export interface VideoResourceVO {
-  id: number
+  id: number | string // Can be knowledge point ID (e.g., 'kp_22') or resource ID
+  realResourceId?: number // Actual t_resource ID for progress tracking
   title: string
   url: string
   duration: number // Total duration in seconds
   courseName: string
   chapterName: string
+  courseId?: number // Course ID for querying progress
 }
 
 // Video study statistics

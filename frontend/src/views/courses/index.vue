@@ -35,6 +35,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import CourseCard from '@/components/CourseCard.vue'
+import { getStudentCourses } from '@/api/course'
 
 interface Course {
   id: number
@@ -49,64 +50,19 @@ const router = useRouter()
 const loading = ref(false)
 const courses = ref<Course[]>([])
 
-// Mock data for development
-const mockCourses: Course[] = [
-  {
-    id: 1,
-    courseName: 'Advanced Machine Learning',
-    teacherName: 'Dr. Zhang Wei',
-    coverUrl: '',
-    credits: 4,
-    startDate: '2024-09-01'
-  },
-  {
-    id: 2,
-    courseName: 'Data Structures & Algorithms',
-    teacherName: 'Prof. Li Ming',
-    coverUrl: '',
-    credits: 3,
-    startDate: '2024-09-01'
-  },
-  {
-    id: 3,
-    courseName: 'Web Development Fundamentals',
-    teacherName: 'Ms. Wang Fang',
-    coverUrl: '',
-    credits: 3,
-    startDate: '2024-09-15'
-  },
-  {
-    id: 4,
-    courseName: 'Database Systems',
-    teacherName: 'Dr. Chen Hui',
-    coverUrl: '',
-    credits: 4,
-    startDate: '2024-10-01'
-  },
-  {
-    id: 5,
-    courseName: 'Computer Networks',
-    teacherName: 'Prof. Liu Yang',
-    coverUrl: '',
-    credits: 3,
-    startDate: '2024-10-15'
-  },
-  {
-    id: 6,
-    courseName: 'Operating Systems',
-    teacherName: 'Dr. Zhao Ming',
-    coverUrl: '',
-    credits: 4,
-    startDate: '2024-11-01'
-  }
-]
-
 const loadCourses = async () => {
   loading.value = true
   try {
-    // In production, this would call the API
-    await new Promise(resolve => setTimeout(resolve, 500))
-    courses.value = mockCourses
+    const res = await getStudentCourses()
+    // Map backend data format to frontend format
+    courses.value = res.data.records.map((c) => ({
+      id: c.id,
+      courseName: c.courseName,
+      teacherName: c.teacherName || 'Unknown Teacher',
+      coverUrl: '', // Backend doesn't provide cover URL
+      credits: c.credits,
+      startDate: c.startDate || '2024-09-01'
+    }))
   } catch (error: any) {
     ElMessage.error(error.message || 'Failed to load courses')
   } finally {

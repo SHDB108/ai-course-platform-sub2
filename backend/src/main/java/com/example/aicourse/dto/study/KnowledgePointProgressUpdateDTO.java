@@ -13,4 +13,5 @@ public class KnowledgePointProgressUpdateDTO {
     private Boolean isCorrect;         // 本次是否正确(用于统计)
     private Integer studyTime;         // 本次学习时长(分钟)
     private String learningContext;    // 学习上下文(可选)
+    private String notes;              // 学习笔记
 }

@@ -54,6 +54,67 @@
       <el-empty v-if="!graphData && !loading" description="No knowledge graph available" />
     </el-card>
 
+    <!-- AI Recommendations Section -->
+    <el-card class="recommendations-card">
+      <template #header>
+        <div class="card-header">
+          <span class="card-title">
+            <el-icon><MagicStick /></el-icon>
+            AI 智能推荐
+          </span>
+          <div class="header-actions">
+            <el-button
+              type="warning"
+              @click="navigateToExamSystem"
+            >
+              <el-icon><Monitor /></el-icon>
+              进入AI考试系统
+            </el-button>
+            <el-button
+              type="primary"
+              :loading="generatingRecommendations"
+              @click="handleGenerateRecommendations"
+            >
+              <el-icon><MagicStick /></el-icon>
+              {{ generatingRecommendations ? 'AI 诊断中...' : 'AI 智能诊断' }}
+            </el-button>
+          </div>
+        </div>
+      </template>
+
+      <div v-loading="recommendationsLoading" class="recommendations-content">
+        <div v-if="recommendations.length === 0 && !recommendationsLoading" class="empty-recommendations">
+          <el-empty description="暂无推荐，点击“AI 智能诊断”生成个性化学习建议" />
+        </div>
+
+        <div v-else class="recommendations-list">
+          <div
+            v-for="rec in recommendations"
+            :key="rec.id"
+            class="recommendation-card"
+          >
+            <div class="recommendation-header">
+              <div class="recommendation-tags">
+                <el-tag :type="getRecommendationTypeColor(rec.type)" size="small">
+                  {{ getRecommendationTypeText(rec.type) }}
+                </el-tag>
+                <el-tag v-if="rec.priority" :type="getPriorityColor(rec.priority)" size="small">
+                  {{ rec.priority }}
+                </el-tag>
+              </div>
+              <div class="recommendation-title">{{ rec.title }}</div>
+            </div>
+            <div class="recommendation-body">
+              <div class="recommendation-reason">
+                <el-icon class="reason-icon"><MagicStick /></el-icon>
+                <span>{{ rec.reason }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </el-card>
+
     <!-- Selected Node Info -->
     <el-drawer
       v-model="drawerVisible"
@@ -91,11 +152,14 @@
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { User, Calendar, VideoPlay } from '@element-plus/icons-vue'
+import { User, Calendar, VideoPlay, MagicStick, Monitor } from '@element-plus/icons-vue'
 import { Graph } from '@antv/g6'
 import { getCourseGraph, getCourseDetail } from '@/api/course'
+import { generateRecommendations, getRecommendations } from '@/api/recommendation'
+import { useUserStore } from '@/stores/user'
 import type { CourseDetailVO } from '@/api/course'
 import type { KnowledgeGraphVO, MasteryLevel } from '@/types/graph'
+import type { LearningRecommendationVO } from '@/types/recommendation'
 
 const route = useRoute()
 const router = useRouter()
@@ -105,6 +169,14 @@ const graphData = ref<KnowledgeGraphVO | null>(null)
 const graphContainer = ref<HTMLElement | null>(null)
 const drawerVisible = ref(false)
 const selectedNode = ref<{ id: string; label: string; category: number; masteryLevel?: MasteryLevel } | null>(null)
+
+// AI Recommendations state
+const recommendations = ref<LearningRecommendationVO[]>([])
+const recommendationsLoading = ref(false)
+const generatingRecommendations = ref(false)
+
+// User store for SSO context propagation
+const userStore = useUserStore()
 
 let graphInstance: Graph | null = null
 
@@ -284,6 +356,67 @@ const startStudy = () => {
   }
 }
 
+// AI Recommendations handlers
+const handleGenerateRecommendations = async () => {
+  generatingRecommendations.value = true
+  try {
+    await generateRecommendations(courseId)
+    ElMessage.success('AI诊断完成')
+    // Automatically fetch the recommendations after generation
+    await loadRecommendations()
+  } catch (error: any) {
+    ElMessage.error(error.message || '生成推荐失败')
+  } finally {
+    generatingRecommendations.value = false
+  }
+}
+
+const loadRecommendations = async () => {
+  recommendationsLoading.value = true
+  try {
+    const res = await getRecommendations(courseId)
+    recommendations.value = res.data || []
+  } catch (error: any) {
+    ElMessage.error(error.message || '加载推荐失败')
+  } finally {
+    recommendationsLoading.value = false
+  }
+}
+
+const getRecommendationTypeColor = (type: string) => {
+  const colors = {
+    KNOWLEDGE_POINT: 'primary',
+    RESOURCE: 'success',
+    STUDY_PLAN: 'warning'
+  } as const
+  return colors[type as keyof typeof colors] || 'info'
+}
+
+const getRecommendationTypeText = (type: string) => {
+  const texts = {
+    KNOWLEDGE_POINT: '知识点',
+    RESOURCE: '资源',
+    STUDY_PLAN: '学习计划'
+  }
+  return texts[type as keyof typeof texts] || type
+}
+
+const getPriorityColor = (priority: string) => {
+  const colors = {
+    HIGH: 'danger',
+    MEDIUM: 'warning',
+    LOW: 'info'
+  } as const
+  return colors[priority as keyof typeof colors] || 'info'
+}
+
+// Cross-system navigation handler
+const navigateToExamSystem = () => {
+  const studentId = userStore.userId || 1
+  const examSystemUrl = `http://172.22.126.152:5173/student/exam?studentId=${studentId}`
+  window.open(examSystemUrl, '_blank')
+}
+
 const handleResize = () => {
   if (graphInstance && graphContainer.value) {
     graphInstance.setSize(graphContainer.value.clientWidth, 500)
@@ -292,6 +425,7 @@ const handleResize = () => {
 
 onMounted(() => {
   loadCourseData()
+  loadRecommendations()
   window.addEventListener('resize', handleResize)
 })
 
@@ -434,6 +568,91 @@ onUnmounted(() => {
       margin-top: 24px;
       display: flex;
       gap: 12px;
+    }
+  }
+
+  .recommendations-card {
+    margin-top: 20px;
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+
+      .card-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 16px;
+        font-weight: 600;
+        color: $text-primary;
+      }
+
+      .header-actions {
+        display: flex;
+        gap: 12px;
+      }
+    }
+
+    .recommendations-content {
+      min-height: 100px;
+
+      .empty-recommendations {
+        padding: 20px 0;
+      }
+
+      .recommendations-list {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+
+        .recommendation-card {
+          padding: 16px;
+          background-color: #fafafa;
+          border: 1px solid $border-color;
+          border-radius: $border-radius-md;
+          transition: all 0.3s;
+
+          &:hover {
+            background-color: #f0f0f0;
+            box-shadow: $shadow-sm;
+          }
+
+          .recommendation-header {
+            margin-bottom: 12px;
+
+            .recommendation-tags {
+              display: flex;
+              gap: 8px;
+              margin-bottom: 8px;
+            }
+
+            .recommendation-title {
+              font-size: 15px;
+              font-weight: 600;
+              color: $text-primary;
+              line-height: 1.5;
+            }
+          }
+
+          .recommendation-body {
+            .recommendation-reason {
+              display: flex;
+              align-items: flex-start;
+              gap: 8px;
+              font-size: 14px;
+              color: $text-secondary;
+              line-height: 1.6;
+
+              .reason-icon {
+                margin-top: 2px;
+                color: $primary-color;
+                flex-shrink: 0;
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

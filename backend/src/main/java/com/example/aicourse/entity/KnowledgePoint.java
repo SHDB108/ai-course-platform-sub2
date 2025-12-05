@@ -19,6 +19,15 @@ public class KnowledgePoint {
     private Long courseId;
     private Integer level;
 
+    /**
+     * 能力标签 - 用于学生能力模型雷达图
+     * 可选值: THEORY, PRACTICE, LOGIC, INNOVATION
+     *
+     * NOTE: Requires SQL DDL execution to add column:
+     * ALTER TABLE t_knowledge_point ADD COLUMN ability_tag VARCHAR(20) DEFAULT 'THEORY' COMMENT '能力标签';
+     */
+    private String abilityTag;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime gmtCreate;
 

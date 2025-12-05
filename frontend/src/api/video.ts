@@ -21,7 +21,7 @@ const mockVideoProgress: VideoProgressVO = {
 
 const USE_MOCK = false
 // Get video resource info
-export const getVideoResource = (resourceId: number): Promise<Result<VideoResourceVO>> => {
+export const getVideoResource = (resourceId: number | string): Promise<Result<VideoResourceVO>> => {
   if (USE_MOCK) {
     return Promise.resolve({
       code: 0,

@@ -141,6 +141,7 @@ import {
   stringifyProgress,
   calculateCompletion
 } from '@/api/video'
+import { getKnowledgePointProgressList, updateKnowledgePoint } from '@/api/study'
 import type { VideoResourceVO } from '@/types/video'
 
 const route = useRoute()
@@ -160,7 +161,22 @@ const currentSegmentStart = ref<number | null>(null)
 // Save interval
 let saveInterval: number | null = null
 
-const resourceId = computed(() => Number(route.params.resourceId) || 1)
+// Real resource ID for progress tracking
+const realResourceId = ref<number | null>(null)
+
+// Knowledge point ID (if resource is kp_22 format)
+const kpId = ref<number | null>(null)
+
+// Parse resource ID from route (handles both 'kp_22' and '123')
+const resourceId = computed(() => {
+  const param = route.params.resourceId as string
+  // If it starts with 'kp_', return it as-is (it's a knowledge point ID)
+  if (param.startsWith('kp_')) {
+    return param
+  }
+  // Otherwise, parse as number (direct resource ID)
+  return Number(param) || 1
+})
 
 const completion = computed(() => {
   return calculateCompletion(watchedSegments.value, totalDuration.value)
@@ -173,18 +189,67 @@ const totalWatched = computed(() => {
 const loadVideoData = async () => {
   loading.value = true
   try {
-    const [resourceRes, progressRes] = await Promise.all([
-      getVideoResource(resourceId.value),
-      getVideoProgress(resourceId.value)
-    ])
+    // First, get the resource details
+    const resourceRes = await getVideoResource(resourceId.value)
 
     videoResource.value = resourceRes.data
     totalDuration.value = resourceRes.data.duration
 
-    // Parse saved progress
-    const progressData = parseProgress(progressRes.data.progress)
-    watchedSegments.value = progressData.segments
-    currentTime.value = progressData.elapsed
+    // Extract the real resource ID for progress tracking
+    realResourceId.value = resourceRes.data.realResourceId || resourceRes.data.id
+
+    // Extract knowledge point ID if resource ID is in kp_22 format
+    if (typeof resourceId.value === 'string' && resourceId.value.startsWith('kp_')) {
+      kpId.value = Number(resourceId.value.substring(3))
+    }
+
+    // Now load progress using the real resource ID
+    const progressRes = await getVideoProgress(realResourceId.value)
+
+    // Parse saved progress with null check
+    if (progressRes.data && progressRes.data.progress) {
+      try {
+        const progressData = parseProgress(progressRes.data.progress)
+
+        // Safely parse progress with Array.isArray check
+        if (progressData && Array.isArray(progressData.segments)) {
+          watchedSegments.value = progressData.segments
+        } else {
+          watchedSegments.value = [] // Reset to empty array if data is corrupt
+        }
+
+        // Safely parse elapsed time
+        if (progressData && typeof progressData.elapsed === 'number') {
+          currentTime.value = progressData.elapsed
+        } else {
+          currentTime.value = 0
+        }
+      } catch (e) {
+        console.warn('Progress data parsing error, resetting to defaults', e)
+        watchedSegments.value = []
+        currentTime.value = 0
+      }
+    } else {
+      // Initialize with default values if no progress exists
+      watchedSegments.value = []
+      currentTime.value = 0
+    }
+
+    // Load notes if both kpId and courseId exist
+    if (kpId.value && videoResource.value.courseId) {
+      try {
+        const progressListRes = await getKnowledgePointProgressList(videoResource.value.courseId)
+        if (progressListRes.data && Array.isArray(progressListRes.data)) {
+          // Find the progress record for current knowledge point
+          const kpProgress = progressListRes.data.find((item: any) => item.knowledgePointId === kpId.value)
+          if (kpProgress && kpProgress.notes) {
+            notes.value = kpProgress.notes
+          }
+        }
+      } catch (error: any) {
+        console.error('Failed to load notes:', error)
+      }
+    }
 
     // Seek to last position after video loads
   } catch (error: any) {
@@ -253,11 +318,11 @@ const mergeSegments = () => {
 }
 
 const saveProgress = async () => {
-  if (!videoResource.value) return
+  if (!videoResource.value || !realResourceId.value) return
 
   try {
     await saveVideoProgress({
-      resourceId: resourceId.value,
+      resourceId: realResourceId.value,
       progress: stringifyProgress(currentTime.value, watchedSegments.value),
       completion: completion.value
     })
@@ -292,8 +357,20 @@ const goBack = () => {
   router.back()
 }
 
-const saveNotes = () => {
-  ElMessage.success('Notes saved!')
+const saveNotes = async () => {
+  if (!kpId.value) {
+    ElMessage.warning('Notes can only be saved for knowledge point resources')
+    return
+  }
+
+  try {
+    await updateKnowledgePoint(kpId.value, {
+      notes: notes.value
+    })
+    ElMessage.success('Notes saved!')
+  } catch (error: any) {
+    ElMessage.error(error.message || 'Failed to save notes')
+  }
 }
 
 // Auto-save every 10 seconds while playing

@@ -21,29 +21,37 @@ public interface LearningRecommendationMapper extends BaseMapper<LearningRecomme
      * @param count 限制查询的数量
      * @return 包含完整信息的学习推荐VO列表
      */
-    @Select("SELECT " +
+    @Select("<script>" +
+            "SELECT " +
             "r.id AS id, " +
-            "r.recommendation_type AS recommendationType, " +
+            "r.recommendation_type AS type, " +
             "r.target_id AS targetId, " +
             "r.reason AS reason, " +
             "CASE " +
             "  WHEN r.recommendation_type = 'KNOWLEDGE_POINT' THEN kp.name " +
             "  ELSE '未知目标' " +
-            "END AS targetName " +
+            "END AS targetName, " +
+            "'MEDIUM' AS priority, " +
+            "CASE " +
+            "  WHEN r.is_dismissed = 0 THEN 'PENDING' " +
+            "  ELSE 'DISMISSED' " +
+            "END AS status, " +
+            "CONCAT('学习建议: ', " +
+            "  CASE " +
+            "    WHEN r.recommendation_type = 'KNOWLEDGE_POINT' THEN kp.name " +
+            "    ELSE '未来目标' " +
+            "  END) AS title, " +
+            "r.gmt_create AS createdAt " +
             "FROM t_learning_recommendation r " +
             "LEFT JOIN t_knowledge_point kp ON r.target_id = kp.id AND r.recommendation_type = 'KNOWLEDGE_POINT' " +
             "WHERE r.student_id = #{studentId} " +
-            "  AND r.course_id = #{courseId} " +
+            "  <if test='courseId != null'> " + // 动态判断
+            "    AND r.course_id = #{courseId} " +
+            "  </if> " +
             "  AND r.is_dismissed = 0 " +
             "ORDER BY r.gmt_create DESC " +
-            "LIMIT #{limit}")
-    @Results({
-            @Result(property = "id", column = "id"),
-            @Result(property = "recommendationType", column = "recommendationType"),
-            @Result(property = "targetId", column = "targetId"),
-            @Result(property = "reason", column = "reason"),
-            @Result(property = "targetName", column = "targetName")
-    })
+            "LIMIT #{limit}" +
+            "</script>")
     List<LearningRecommendationVO> selectEnrichedRecommendations(
             @Param("studentId") Long studentId,
             @Param("courseId") Long courseId,

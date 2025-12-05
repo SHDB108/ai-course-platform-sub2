@@ -5,6 +5,7 @@ import com.example.aicourse.client.AssessmentClient;
 import com.example.aicourse.client.KnowledgeGraphClient;
 import com.example.aicourse.dto.study.*;
 import com.example.aicourse.entity.*;
+import com.example.aicourse.enums.AbilityType;
 import com.example.aicourse.repository.*;
 import com.example.aicourse.service.LlmService;
 import com.example.aicourse.service.StudyProgressService;
@@ -125,6 +126,9 @@ public class StudyProgressServiceImpl implements StudyProgressService {
         analysis.setProgressAnalysis(buildProgressAnalysis(studentId, courseId));
         analysis.setKnowledgeAnalysis(buildKnowledgeAnalysis(studentId, courseId));
         analysis.setBehaviorAnalysis(buildBehaviorAnalysis(studentId, courseId));
+
+        // 构建能力雷达图数据
+        analysis.setCapabilityRadar(buildCapabilityRadar(studentId, courseId));
         
         // 生成预测和建议
         analysis.setPredictions(generatePredictions(studentId, courseId));
@@ -409,7 +413,12 @@ public class StudyProgressServiceImpl implements StudyProgressService {
         if (updateDTO.getStudyTime() != null) {
             progress.setTotalStudyTime(progress.getTotalStudyTime() + updateDTO.getStudyTime());
         }
-        
+
+        // 更新笔记
+        if (updateDTO.getNotes() != null) {
+            progress.setNotes(updateDTO.getNotes());
+        }
+
         progress.setLastStudyTime(LocalDateTime.now());
         
         // 检查是否达到掌握标准
@@ -770,13 +779,14 @@ public class StudyProgressServiceImpl implements StudyProgressService {
         vo.put("lastStudyTime", progress.getLastStudyTime());
         vo.put("nextReviewTime", progress.getNextReviewTime());
         vo.put("reviewStatus", progress.getReviewStatus());
-        
+        vo.put("notes", progress.getNotes());
+
         // 获取知识点名称
         knowledgeGraphClient.getKnowledgePoint(progress.getKnowledgePointId()).ifPresent(kp -> {
             vo.put("knowledgePointName", kp.getName());
             vo.put("knowledgePointDescription", kp.getDescription());
         });
-        
+
         return vo;
     }
     
@@ -837,21 +847,92 @@ public class StudyProgressServiceImpl implements StudyProgressService {
     
     private StudyAnalysisVO.BehaviorAnalysis buildBehaviorAnalysis(Long studentId, Long courseId) {
         StudyAnalysisVO.BehaviorAnalysis analysis = new StudyAnalysisVO.BehaviorAnalysis();
-        
+
         List<StudySession> sessions = studySessionMapper.findByStudentAndCourse(studentId, courseId);
         if (!sessions.isEmpty()) {
             double avgDuration = sessions.stream().mapToInt(s -> s.getDuration() != null ? s.getDuration() : 0).average().orElse(0.0);
             analysis.setAverageSessionDuration((int) avgDuration);
         }
-        
+
         analysis.setStudyPattern("规律学习");
         analysis.setPreferredStudyTime("晚上");
         analysis.setDevicePreference("PC");
         analysis.setEngagementScore(85.0);
-        
+
         return analysis;
     }
-    
+
+    /**
+     * 构建能力雷达图数据
+     * 根据知识点的能力标签(abilityTag)进行分组统计
+     */
+    private List<StudyAnalysisVO.CapabilityStats> buildCapabilityRadar(Long studentId, Long courseId) {
+        // 1. 获取该课程所有知识点的学习进度
+        List<KnowledgePointProgress> progressList = knowledgePointProgressMapper.findByStudentAndCourse(studentId, courseId);
+
+        // 2. 获取所有知识点ID
+        List<Long> knowledgePointIds = progressList.stream()
+                .map(KnowledgePointProgress::getKnowledgePointId)
+                .collect(Collectors.toList());
+
+        // 3. 获取所有知识点详情（包含abilityTag）
+        // 由于knowledgeGraphClient可能不支持批量查询，这里使用流式处理
+        Map<Long, KnowledgePoint> knowledgePointMap = new HashMap<>();
+        for (Long kpId : knowledgePointIds) {
+            knowledgeGraphClient.getKnowledgePoint(kpId).ifPresent(kp ->
+                knowledgePointMap.put(kpId, kp)
+            );
+        }
+
+        // 4. 构建能力维度统计数据：按abilityTag分组
+        Map<String, List<KnowledgePointProgress>> abilityGroupMap = new HashMap<>();
+
+        for (KnowledgePointProgress progress : progressList) {
+            KnowledgePoint kp = knowledgePointMap.get(progress.getKnowledgePointId());
+            if (kp != null) {
+                // 获取能力标签，如果为null或空，默认使用THEORY
+                String abilityTag = kp.getAbilityTag();
+                if (abilityTag == null || abilityTag.trim().isEmpty()) {
+                    abilityTag = AbilityType.THEORY.name();
+                }
+
+                abilityGroupMap.computeIfAbsent(abilityTag, k -> new ArrayList<>()).add(progress);
+            }
+        }
+
+        // 5. 遍历所有能力维度，计算统计数据
+        List<StudyAnalysisVO.CapabilityStats> capabilityStatsList = new ArrayList<>();
+
+        for (AbilityType abilityType : AbilityType.values()) {
+            String abilityName = abilityType.name();
+            List<KnowledgePointProgress> abilityProgressList = abilityGroupMap.getOrDefault(abilityName, new ArrayList<>());
+
+            StudyAnalysisVO.CapabilityStats stats = new StudyAnalysisVO.CapabilityStats();
+            stats.setAbility(abilityName);
+            stats.setAbilityName(abilityType.getChineseName());
+            stats.setTotalPoints(abilityProgressList.size());
+
+            // 统计已掌握的知识点数（MASTERED或EXPERT状态）
+            long masteredCount = abilityProgressList.stream()
+                    .filter(progress -> "MASTERED".equals(progress.getMasteryLevel())
+                                     || "EXPERT".equals(progress.getMasteryLevel()))
+                    .count();
+
+            stats.setMasteredPoints((int) masteredCount);
+
+            // 计算掌握率
+            if (abilityProgressList.size() > 0) {
+                stats.setMasteryRate(masteredCount * 100.0 / abilityProgressList.size());
+            } else {
+                stats.setMasteryRate(0.0);
+            }
+
+            capabilityStatsList.add(stats);
+        }
+
+        return capabilityStatsList;
+    }
+
     private StudyPlanContent fallbackStudyPlanContent(String courseName, String planType) {
         StudyPlanContent content = new StudyPlanContent();
         content.setGoals(Arrays.asList(
